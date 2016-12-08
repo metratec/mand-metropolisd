@@ -6,7 +6,7 @@ dnl #   standard Autoconf prolog
 
 AC_PREREQ(2.59)
 
-AC_INIT(cfgd, [1.0])
+AC_INIT(mand-metropolisd, [1.0])
 AC_CONFIG_SRCDIR(src/cfgd.c)
 AC_CONFIG_AUX_DIR(config)
 AC_CONFIG_MACRO_DIR([m4])
@@ -14,11 +14,10 @@ AM_INIT_AUTOMAKE(1.9)
 
 AC_SRCDIR_PREFIX(srcdir_prefix)
 AC_HEADLINE(dnl
-OpenCPE configuration deamon for OpenWRT, dnl
+Configuration deamon for Metropolis, dnl
 [Released under MPL 2.0])
 AC_CONFIG_PARAM(config.param)
 AM_CONFIG_HEADER(config.h)
-AC_PREFIX_DEFAULT(/usr)
 AC_PLATFORM(PLATFORM)
 
 dnl ##

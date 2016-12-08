@@ -7,7 +7,7 @@
 *\.la
 
 # mand build files
-src/mand-cfgd
+src/mand-metropolisd
 
 # automake / autoconf files
 autom4te.cache/
