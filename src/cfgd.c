@@ -220,9 +220,11 @@ void set_if_addr(struct interface_list *info)
 		              "Name=%s\n"
 		              "[Link]\n"
 		              "MTUBytes=%d\n"
-		              "[Network]\n",
+		              "[Network]\n"
+		              "DHCP=%s\n",
 		        _ident, iface->name,
-		        iface->ipv4.mtu > iface->ipv6.mtu ? iface->ipv4.mtu : iface->ipv6.mtu);
+		        iface->ipv4.mtu > iface->ipv6.mtu ? iface->ipv4.mtu : iface->ipv6.mtu,
+		        iface->dhcp.enabled ? "yes" : "no");
 
 		for (int j = 0; j < iface->ipv4.addr.count; j++)
 			fprintf(fout, "Address=%s/%s\n",

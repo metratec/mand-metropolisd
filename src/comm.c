@@ -98,7 +98,8 @@ int sys_scan(const char *file, const char *fmt, ...)
 	return rc;
 }
 
-typedef void (*DECODE_CB)(const char *name, uint32_t code, uint32_t vendor_id, void *data, size_t size, void *cb_data);
+typedef void (*DECODE_CB)(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+                          void *data, size_t size, void *cb_data);
 
 static void new_var_list(void *ctx, struct var_list *list, size_t size)
 {
@@ -138,7 +139,7 @@ static void add_string_list(struct string_list *list, const void *data, size_t s
 }
 
 uint32_t
-decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_data)
+decode_node_list(DMCONTEXT *socket, const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_data)
 {
 	uint32_t r;
 	DM2_AVPGRP container;
@@ -167,7 +168,7 @@ decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_dat
 		if (!(path = talloc_asprintf(container.ctx, "%s.%s", prefix, name)))
 			return RC_ERR_ALLOC;
 
-		while (decode_node_list(path, &container, cb, cb_data) == RC_OK) {
+		while (decode_node_list(socket, path, &container, cb, cb_data) == RC_OK) {
 		}
 
 		break;
@@ -179,7 +180,7 @@ decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_dat
 		if (!(path = talloc_asprintf(container.ctx, "%s.%d", prefix, id)))
 			return RC_ERR_ALLOC;
 
-		while (decode_node_list(path, &container, cb, cb_data) == RC_OK) {
+		while (decode_node_list(socket, path, &container, cb, cb_data) == RC_OK) {
 		}
 
 		break;
@@ -191,7 +192,7 @@ decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_dat
 		if (!(path = talloc_asprintf(container.ctx, "%s.%s", prefix, name)))
 			return RC_ERR_ALLOC;
 
-		while (decode_node_list(path, &container, cb, cb_data) == RC_OK) {
+		while (decode_node_list(socket, path, &container, cb, cb_data) == RC_OK) {
 		}
 
 		break;
@@ -207,7 +208,7 @@ decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_dat
 		if ((r = dm_expect_avp(&container, &code, &vendor_id, &data, &size)) != RC_OK)
 			return r;
 
-		cb(path, code, vendor_id, data, size, cb_data);
+		cb(socket, path, code, vendor_id, data, size, cb_data);
 		break;
 
 	case AVP_ARRAY:
@@ -221,7 +222,7 @@ decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_dat
 		while (dm_expect_group_end(&container) != RC_OK) {
 			if ((r = dm_expect_avp(&container, &code, &vendor_id, &data, &size)) != RC_OK)
 				return r;
-			cb(path, code, vendor_id, data, size, cb_data);
+			cb(socket, path, code, vendor_id, data, size, cb_data);
 		}
 		break;
 
@@ -237,7 +238,8 @@ decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_dat
  * NOTE: this version cut some corners, more carefull check are needed when/if
  *       the datamodel also supports TCP
  */
-void ntp_cb(const char *name, uint32_t code, uint32_t vendor_id, void *data, size_t size, void *cb_data)
+void ntp_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+            void *data, size_t size, void *cb_data)
 {
 	struct ntp_servers *srvs = (struct ntp_servers *)cb_data;
 	const char *s;
@@ -277,7 +279,7 @@ ntpListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *
 	if (!srvs.server)
 		return;
 
-        while (decode_node_list("", grp, ntp_cb, &srvs) == RC_OK) {
+        while (decode_node_list(socket, "", grp, ntp_cb, &srvs) == RC_OK) {
         }
 
 	set_ntp_server(&srvs);
@@ -301,7 +303,8 @@ struct dns_params {
 	struct string_list srvs;
 };
 
-void dns_cb(const char *name, uint32_t code, uint32_t vendor_id, void *data, size_t size, void *cb_data)
+void dns_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+            void *data, size_t size, void *cb_data)
 {
 	struct dns_params *info = (struct dns_params *)cb_data;
 	const char *s;
@@ -332,7 +335,7 @@ dnsListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *
 	new_string_list(grp->ctx, &info.search);
 	new_string_list(grp->ctx, &info.srvs);
 
-        while (decode_node_list("", grp, dns_cb, &info) == RC_OK) {
+        while (decode_node_list(socket, "", grp, dns_cb, &info) == RC_OK) {
         }
 
 	set_dns(&info.search, &info.srvs);
@@ -364,7 +367,8 @@ void ssh_key(const char *name, void *data, size_t size, struct auth_ssh_key_list
 	}
 }
 
-void auth_cb(const char *name, uint32_t code, uint32_t vendor_id, void *data, size_t size, void *cb_data)
+void auth_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+             void *data, size_t size, void *cb_data)
 {
 	struct auth_list *info = (struct auth_list *)cb_data;
 	const char *s;
@@ -412,7 +416,7 @@ AuthListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void 
 
 	new_var_list(grp->ctx, (struct var_list *)&auth, sizeof(struct auth_user));
 
-        while (decode_node_list("", grp, auth_cb, &auth) == RC_OK) {
+        while (decode_node_list(socket, "", grp, auth_cb, &auth) == RC_OK) {
         }
 
 	set_authentication(&auth);
@@ -502,10 +506,13 @@ void if_ip(const char *name, void *data, size_t size, struct if_ip *if_ip)
 	}
 }
 
-void if_cb(const char *name, uint32_t code, uint32_t vendor_id, void *data, size_t size, void *cb_data)
+void if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+           void *data, size_t size, void *cb_data)
 {
 	struct interface_list *info = (struct interface_list *)cb_data;
 	const char *s;
+
+	uint32_t rc;
 
 	if (!(s = strchr(name + 1, '.')))
 		return;
@@ -514,6 +521,13 @@ void if_cb(const char *name, uint32_t code, uint32_t vendor_id, void *data, size
 
 	if (strncmp(s + 1, "name", 4) == 0) {
 		struct interface *d;
+
+		char search_path[256];
+		struct dm2_avp search = {
+			.code = AVP_PATH,
+			.vendor_id = VP_TRAVELPING,
+			.data = search_path
+		};
 
 		if (!(d = add_var_list((struct var_list *)info, sizeof(struct interface))))
 			return;
@@ -524,6 +538,17 @@ void if_cb(const char *name, uint32_t code, uint32_t vendor_id, void *data, size
 		new_var_list(info->ctx, (struct var_list *)&d->ipv6.neigh, sizeof(struct ip_list));
 
 		d->name = talloc_strndup(info->ctx, data, size);
+
+		/*
+		 * Since we support DHCP clients as specified by ietf-dhcp@2016-08-25.yang,
+		 * we need to determine whether an dhcp.client.interfaces.X node exists.
+		 * FIXME: Unfortunately, these queries are not atomic.
+		 * Also, we will have to use the blocking dmconfig API.
+		 */
+		search.size = snprintf(search_path, sizeof(search_path),
+		                       "interfaces%.*s", (int)(s - name), name);
+		rc = rpc_db_findinstance(socket, "dhcp.client.interfaces", "interface", &search, NULL);
+		d->dhcp.enabled = rc == RC_OK;
 	} else if (strncmp(s + 1, "ipv4", 4) == 0) {
 		if_ip(s + 6, data, size, &info->iface[info->count - 1].ipv4);
 	} else if (strncmp(s + 1, "ipv6", 4) == 0) {
@@ -547,7 +572,7 @@ ifListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *u
 
 	new_var_list(grp->ctx, (struct var_list *)&info, sizeof(struct interface));
 
-        while (decode_node_list("", grp, if_cb, &info) == RC_OK) {
+        while (decode_node_list(socket, "", grp, if_cb, &info) == RC_OK) {
         }
 
 	if (flag | IF_NEIGH)
@@ -649,6 +674,8 @@ uint32_t rpc_client_event_broadcast(void *ctx, const char *path, uint32_t type)
 		listAuthentication(ctx);
 	else if (strncmp(path, "interfaces", 10) == 0)
 		listInterfaces(ctx, IF_IP | IF_NEIGH);
+	else if (strncmp(path, "dhcp.client", 11) == 0)
+		listInterfaces(ctx, IF_IP);
 
 	return RC_OK;
 }

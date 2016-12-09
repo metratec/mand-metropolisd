@@ -72,10 +72,15 @@ struct if_ip {
 	struct ip_list neigh;
 };
 
+struct if_dhcp {
+	uint8_t enabled;
+};
+
 struct interface {
 	char *name;
 	struct if_ip ipv4;
 	struct if_ip ipv6;
+	struct if_dhcp dhcp;
 };
 
 struct interface_list {
