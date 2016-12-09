@@ -295,6 +295,22 @@ static void sig_pipe(EV_P_ ev_signal *w, int revents)
 	logx(LOG_DEBUG, "sig_pipe");
 }
 
+static void sig_term(EV_P_ ev_signal *w, int revents)
+{
+	const char *signal_name = w->data;
+
+	logx(LOG_INFO, "Signal %s received. Shutting down gracefully...", signal_name);
+	ev_break(EV_A_ EVBREAK_ALL);
+
+	/*
+	 * Stopping the signal watcher restores the default
+	 * signal action.
+	 * This is important since it allows program termination even if
+	 * graceful shutdown is broken.
+	 */
+	ev_signal_stop(EV_A_ w);
+}
+
 static void usage(void)
 {
 	printf("cfgd, Version: .....\n\n"
@@ -314,9 +330,8 @@ int main(int argc, char *argv[])
 		.rlim_max = RLIM_INFINITY
 	};
 
-	ev_signal signal_usr1;
-	ev_signal signal_usr2;
-	ev_signal signal_pipe;
+	ev_signal signal_usr1, signal_usr2, signal_pipe;
+	ev_signal signal_hup, signal_int, signal_term;
 
 	int c;
 
@@ -372,6 +387,22 @@ int main(int argc, char *argv[])
 
 	ev_signal_init(&signal_pipe, sig_pipe, SIGPIPE);
 	ev_signal_start(EV_DEFAULT_ &signal_pipe);
+
+	/*
+	 * Register termination signal watchers.
+	 * This is important to perform graceful shutdowns when being
+	 * supervised (e.g. by systemd).
+	 * Also, cleaning up on exit eases debugging using Valgrind/memcheck.
+	 */
+	ev_signal_init(&signal_hup, sig_term, SIGHUP);
+	signal_hup.data = "SIGHUP";
+	ev_signal_start(EV_DEFAULT_ &signal_hup);
+	ev_signal_init(&signal_int, sig_term, SIGINT);
+	signal_int.data = "SIGINT";
+	ev_signal_start(EV_DEFAULT_ &signal_int);
+	ev_signal_init(&signal_term, sig_term, SIGTERM);
+	signal_term.data = "SIGTERM";
+	ev_signal_start(EV_DEFAULT_ &signal_term);
 
 	init_comm(EV_DEFAULT);
 
