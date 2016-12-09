@@ -70,7 +70,7 @@
         s; \
 })
 
-int sys_scan(const char *file, const char *fmt, ...)
+static int sys_scan(const char *file, const char *fmt, ...)
 {
 	FILE *fin;
 	int rc, _errno;
@@ -134,7 +134,7 @@ static void add_string_list(struct string_list *list, const void *data, size_t s
 	*d = talloc_strndup(list->ctx, data, size);
 }
 
-uint32_t
+static uint32_t
 decode_node_list(DMCONTEXT *socket, const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_data)
 {
 	uint32_t r;
@@ -234,8 +234,9 @@ decode_node_list(DMCONTEXT *socket, const char *prefix, DM2_AVPGRP *grp, DECODE_
  * NOTE: this version cut some corners, more carefull check are needed when/if
  *       the datamodel also supports TCP
  */
-void ntp_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
-            void *data, size_t size, void *cb_data)
+static void
+ntp_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+       void *data, size_t size, void *cb_data)
 {
 	struct ntp_servers *srvs = (struct ntp_servers *)cb_data;
 	const char *s;
@@ -256,7 +257,7 @@ void ntp_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_
 	}
 }
 
-void
+static void
 ntpListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *userdata __attribute__((unused)))
 {
 	uint32_t rc, answer_rc;
@@ -299,8 +300,9 @@ struct dns_params {
 	struct string_list srvs;
 };
 
-void dns_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
-            void *data, size_t size, void *cb_data)
+static void
+dns_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+       void *data, size_t size, void *cb_data)
 {
 	struct dns_params *info = (struct dns_params *)cb_data;
 	const char *s;
@@ -315,8 +317,9 @@ void dns_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_
 	}
 }
 
-void
-dnsListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *userdata __attribute__((unused)))
+static void
+dnsListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+                void *userdata __attribute__((unused)))
 {
 	uint32_t rc, answer_rc;
 	struct dns_params info;
@@ -346,7 +349,8 @@ listSystemDns(DMCONTEXT *dmCtx)
 
 /***************************************/
 
-void ssh_key(const char *name, void *data, size_t size, struct auth_ssh_key_list *list)
+static void
+ssh_key(const char *name, void *data, size_t size, struct auth_ssh_key_list *list)
 {
 	if (strncmp(name, "name", 4) == 0) {
 		struct auth_ssh_key *d;
@@ -363,8 +367,9 @@ void ssh_key(const char *name, void *data, size_t size, struct auth_ssh_key_list
 	}
 }
 
-void auth_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
-             void *data, size_t size, void *cb_data)
+static void
+auth_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+        void *data, size_t size, void *cb_data)
 {
 	struct auth_list *info = (struct auth_list *)cb_data;
 	const char *s;
@@ -398,7 +403,8 @@ void auth_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor
 }
 
 static void
-AuthListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *userdata __attribute__((unused)))
+AuthListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+                 void *userdata __attribute__((unused)))
 {
 	uint32_t rc, answer_rc;
 	struct auth_list auth;
@@ -435,7 +441,8 @@ struct if_params {
 	struct string_list srvs;
 };
 
-void if_ip_addr(const char *name, void *data, size_t size, struct ip_list *list)
+static void
+if_ip_addr(const char *name, void *data, size_t size, struct ip_list *list)
 {
 	const char *s;
 
@@ -461,7 +468,8 @@ void if_ip_addr(const char *name, void *data, size_t size, struct ip_list *list)
 	}
 }
 
-void if_ip_neigh(const char *name, void *data, size_t size, struct ip_list *list)
+static void
+if_ip_neigh(const char *name, void *data, size_t size, struct ip_list *list)
 {
 	const char *s;
 
@@ -487,7 +495,8 @@ void if_ip_neigh(const char *name, void *data, size_t size, struct ip_list *list
 	}
 }
 
-void if_ip(const char *name, void *data, size_t size, struct if_ip *if_ip)
+static void
+if_ip(const char *name, void *data, size_t size, struct if_ip *if_ip)
 {
 	if (strncmp("enabled", name, 7) == 0) {
 		if_ip->enabled = dm_get_uint8_avp(data);
@@ -502,8 +511,9 @@ void if_ip(const char *name, void *data, size_t size, struct if_ip *if_ip)
 	}
 }
 
-void if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
-           void *data, size_t size, void *cb_data)
+static void
+if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+      void *data, size_t size, void *cb_data)
 {
 	struct interface_list *info = (struct interface_list *)cb_data;
 	const char *s;
@@ -688,7 +698,8 @@ static uint32_t if_ioctl(int d, int request, void *data)
 	return RC_OK;
 }
 
-void add_neigh_to_answer(struct nl_object *obj, void *data)
+static void
+add_neigh_to_answer(struct nl_object *obj, void *data)
 {
 	char buf[32];
 	DM2_REQUEST *answer = data;
@@ -712,7 +723,8 @@ void add_neigh_to_answer(struct nl_object *obj, void *data)
 		return;
 }
 
-void add_addr_to_answer(struct nl_object *obj, void *data)
+static void
+add_addr_to_answer(struct nl_object *obj, void *data)
 {
 	char buf[32];
 	DM2_REQUEST *answer = data;

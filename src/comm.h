@@ -5,9 +5,6 @@
 #ifndef __COMM_H
 #define __COMM_H
 
-typedef void (comm_notify_cb)(void *);
-
 void init_comm(struct ev_loop *lopp);
-char *uci_get(const char *fmt, ...) __attribute__ ((__format__ (__printf__, 1, 2)));
 
 #endif
