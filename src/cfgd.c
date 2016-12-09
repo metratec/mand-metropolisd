@@ -18,10 +18,8 @@
 #include <time.h>
 #include <limits.h>
 #include <sys/socket.h>
-#include <sys/time.h>
 #include <sys/queue.h>
 #include <sys/tree.h>
-#include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
@@ -325,18 +323,10 @@ static void usage(void)
 
 int main(int argc, char *argv[])
 {
-	const struct rlimit rlim = {
-		.rlim_cur = RLIM_INFINITY,
-		.rlim_max = RLIM_INFINITY
-	};
-
 	ev_signal signal_usr1, signal_usr2, signal_pipe;
 	ev_signal signal_hup, signal_int, signal_term;
 
 	int c;
-
-	/* unlimited size for cores */
-	setrlimit(RLIMIT_CORE, &rlim);
 
 	logx_level = LOG_INFO;
 
