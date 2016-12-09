@@ -58,31 +58,31 @@ static int vasystem(const char *fmt, ...) __attribute__ ((__format__ (__printf__
 
 static int vsystem(const char *cmd)
 {
-        int rc = 0;
-        int _errno;
+	int rc = 0;
+	int _errno;
 
-        logx(LOG_INFO, "cmd=[%s]", cmd);
+	logx(LOG_INFO, "cmd=[%s]", cmd);
 
-        errno = 0;
-        rc = system(cmd);
+	errno = 0;
+	rc = system(cmd);
 
-        _errno = errno;
-        logx(LOG_INFO, "cmd=[%s], rc=%d, error=%s", cmd, rc, strerror(_errno));
+	_errno = errno;
+	logx(LOG_INFO, "cmd=[%s], rc=%d, error=%s", cmd, rc, strerror(_errno));
 	errno = _errno;
 
-        return rc;
+	return rc;
 }
 
 static int vasystem(const char *fmt, ...)
 {
-        va_list args;
-        char    buf[1024];
+	va_list args;
+	char    buf[1024];
 
-        va_start(args, fmt);
-        vsnprintf(buf, sizeof(buf), fmt, args);
-        va_end(args);
+	va_start(args, fmt);
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	va_end(args);
 
-        return vsystem(buf);
+	return vsystem(buf);
 }
 
 void set_ntp_server(const struct ntp_servers *servers)
@@ -365,13 +365,13 @@ int main(int argc, char *argv[])
 	logx_open(basename(argv[0]), LOG_CONS | LOG_PID | LOG_PERROR, LOG_DAEMON);
 
 	ev_signal_init(&signal_usr1, sig_usr1, SIGUSR1);
-        ev_signal_start(EV_DEFAULT_ &signal_usr1);
+	ev_signal_start(EV_DEFAULT_ &signal_usr1);
 
-        ev_signal_init(&signal_usr2, sig_usr2, SIGUSR2);
-        ev_signal_start(EV_DEFAULT_ &signal_usr2);
+	ev_signal_init(&signal_usr2, sig_usr2, SIGUSR2);
+	ev_signal_start(EV_DEFAULT_ &signal_usr2);
 
-        ev_signal_init(&signal_pipe, sig_pipe, SIGPIPE);
-        ev_signal_start(EV_DEFAULT_ &signal_pipe);
+	ev_signal_init(&signal_pipe, sig_pipe, SIGPIPE);
+	ev_signal_start(EV_DEFAULT_ &signal_pipe);
 
 	init_comm(EV_DEFAULT);
 
@@ -379,5 +379,5 @@ int main(int argc, char *argv[])
 
 	ev_run(EV_DEFAULT, 0);
 
-        return 0;
+	return 0;
 }
