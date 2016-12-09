@@ -54,15 +54,11 @@
 
 #define CB_ERR(...) \
 	do {					\
-		fprintf(stderr, __VA_ARGS__);	\
-		fprintf(stderr, "\n");		\
 		logx(LOG_ERR, __VA_ARGS__);	\
 		return;				\
 	} while (0)
 #define CB_ERR_RET(ret, ...)			\
 	do {					\
-		fprintf(stderr, __VA_ARGS__);	\
-		fprintf(stderr, "\n");		\
 		logx(LOG_ERR, __VA_ARGS__);	\
 		return ret;			\
 	} while (0)
@@ -381,7 +377,7 @@ void auth_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor
 	if (strncmp(s + 1, "name", 4) == 0) {
 		struct auth_user *d;
 
-		printf("user (%d): %*s\n", info->count, (int)size, (char *)data);
+		logx(LOG_DEBUG, "user (%d): %*s", info->count, (int)size, (char *)data);
 		if (!(d = add_var_list((struct var_list *)info, sizeof(struct auth_user))))
 			return;
 
@@ -389,7 +385,7 @@ void auth_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor
 
 		d->name = talloc_strndup(info->ctx, data, size);
 	} else if (strncmp(s + 1, "password", 8) == 0) {
-		printf("pass: %*s\n", (int)size, (char *)data);
+		logx(LOG_DEBUG, "pass: %*s", (int)size, (char *)data);
 		info->user[info->count - 1].password = talloc_strndup(info->ctx, data, size);
 	} else {
 		if (strncmp(s + 1, "ssh-key.", 8) == 0) {
@@ -599,8 +595,8 @@ request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 	req.code = dm_packet_code(pkt);
 
 #ifdef LIBDMCONFIG_DEBUG
-	fprintf(stderr, "Received %s:\n",
-		dm_packet_flags(pkt) & CMD_FLAG_REQUEST ? "request" : "answer");
+	logx(LOG_DEBUG, "Received %s:",
+	     dm_packet_flags(pkt) & CMD_FLAG_REQUEST ? "request" : "answer");
 	dump_dm_packet(pkt);
 #endif
 
@@ -663,8 +659,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 
 uint32_t rpc_client_event_broadcast(void *ctx, const char *path, uint32_t type)
 {
-	printf("Event: %d on \"%s\"\n", type, path);
-	logx(LOG_DEBUG, "Event: %d on \"%s\"\n", type, path);
+	logx(LOG_DEBUG, "Event: %d on \"%s\"", type, path);
 
 	if (strncmp(path, "system.ntp", 10) == 0)
 		listSystemNtp(ctx);
@@ -726,7 +721,8 @@ void add_addr_to_answer(struct nl_object *obj, void *data)
 	unsigned int flags = rtnl_addr_get_flags((struct rtnl_addr *) obj);
 	uint8_t origin = 0;
 	uint8_t status = 4;
-	printf("IP: %s\n", nl_addr2str(naddr, buf, sizeof(buf)));
+
+	logx(LOG_DEBUG, "IP: %s", nl_addr2str(naddr, buf, sizeof(buf)));
 
 	if (flags & IFA_F_OPTIMISTIC)
 		status = 7;
@@ -763,7 +759,7 @@ uint32_t rpc_client_get_interface_state(void *ctx, const char *if_name, DM2_REQU
         uint64_t snd_pkt = 0, snd_oct = 0, snd_err = 0, snd_drop = 0;
 	int scan_count;
 
-	printf("rpc_client_get_interface_state: %s\n", if_name);
+	logx(LOG_DEBUG, "rpc_client_get_interface_state: %s", if_name);
 
 	dev = if_name;
 
@@ -800,8 +796,10 @@ uint32_t rpc_client_get_interface_state(void *ctx, const char *if_name, DM2_REQU
 	if (!(fp = fopen("/proc/net/dev", "r")))
 		return RC_ERR_MISC;
 
-	if (!fgets(line, sizeof(line), fp)) fprintf(stderr, "Cannot parse %s.\n", "/proc/net/dev"); /* ignore first line */
-	if (!fgets(line, sizeof(line), fp)) fprintf(stderr, "Cannot parse %s.\n", "/proc/net/dev");
+	if (!fgets(line, sizeof(line), fp)) /* ignore first line */
+		logx(LOG_ERR, "Cannot parse /proc/net/dev");
+	if (!fgets(line, sizeof(line), fp))
+		logx(LOG_ERR, "Cannot parse /proc/net/dev");
 
 	while (!feof(fp)) {
 		char device[32];
@@ -868,7 +866,7 @@ uint32_t rpc_client_get_interface_state(void *ctx, const char *if_name, DM2_REQU
 	snprintf(line, sizeof(line), "/proc/sys/net/ipv4/conf/%s/forwarding", dev);
 	sys_scan(line, "%u", &forward);
 
-	printf("IPv4 Forward: %d\n", forward);
+	logx(LOG_DEBUG, "IPv4 Forward: %d", forward);
 	if ((rc = dm_add_uint8(answer, AVP_BOOL, VP_TRAVELPING, forward)) != RC_OK
 	    || (rc = dm_add_uint32(answer, AVP_UINT32, VP_TRAVELPING, mtu)) != RC_OK)
 		goto exit_nl;
@@ -904,7 +902,7 @@ uint32_t rpc_client_get_interface_state(void *ctx, const char *if_name, DM2_REQU
 	snprintf(line, sizeof(line), "/proc/sys/net/ipv6/conf/%s/forwarding", dev);
 	sys_scan(line, "%u", &forward);
 
-	printf("IPv6 Forward: %d\n", forward);
+	logx(LOG_DEBUG, "IPv6 Forward: %d", forward);
 	if ((rc = dm_add_uint8(answer, AVP_BOOL, VP_TRAVELPING, forward)) != RC_OK
 	    || (rc = dm_add_uint32(answer, AVP_UINT32, VP_TRAVELPING, mtu)) != RC_OK)
 		goto exit_nl;

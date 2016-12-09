@@ -61,13 +61,13 @@ static int vsystem(const char *cmd)
         int rc = 0;
         int _errno;
 
-        fprintf(stderr, "cmd=[%s]\n", cmd);
+        logx(LOG_INFO, "cmd=[%s]", cmd);
 
         errno = 0;
         rc = system(cmd);
 
         _errno = errno;
-        fprintf(stderr, "cmd=[%s], rc=%d, error=%s\n", cmd, rc, strerror(_errno));
+        logx(LOG_INFO, "cmd=[%s], rc=%d, error=%s", cmd, rc, strerror(_errno));
 	errno = _errno;
 
         return rc;
@@ -171,7 +171,7 @@ void set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
 		goto exit;
 
 	for (i = 0; i < list->count; i++) {
-		fprintf(stderr, "    Key: %s %s %s\n", list->ssh[i].algo, list->ssh[i].data, list->ssh[i].name);
+		logx(LOG_INFO, "  Key: %s %s %s", list->ssh[i].algo, list->ssh[i].data, list->ssh[i].name);
 		fprintf(fout, "%s %s %s\n", list->ssh[i].algo, list->ssh[i].data, list->ssh[i].name);
 	}
 	fclose(fout);
@@ -184,12 +184,12 @@ void set_authentication(const struct auth_list *auth)
 {
 	int i;
 
-	printf("Users: %d\n", auth->count);
+	logx(LOG_DEBUG, "Users: %d", auth->count);
 	for (i = 0; i < auth->count; i++) {
-		fprintf(stderr, "  User: %s, pass: %s, ssh: %d\n", auth->user[i].name, auth->user[i].password, auth->user[i].ssh.count);
+		logx(LOG_INFO, "User: %s, pass: %s, ssh: %d",
+		     auth->user[i].name, auth->user[i].password, auth->user[i].ssh.count);
 
 		set_ssh_keys(auth->user[i].name, &auth->user[i].ssh);
-
 	}
 }
 
@@ -268,7 +268,7 @@ void set_if_neigh(struct interface_list *info)
 
 void set_value(char *path, const char *str)
 {
-	fprintf(stderr, "Parameter \"%s\" changed to \"%s\"\n", path, str);
+	logx(LOG_DEBUG, "Parameter \"%s\" changed to \"%s\"", path, str);
 
 	if (strcmp(path, "system.hostname") == 0) {
 		/*
@@ -362,7 +362,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	logx_open(basename(argv[0]), 0, LOG_DAEMON);
+	logx_open(basename(argv[0]), LOG_CONS | LOG_PID | LOG_PERROR, LOG_DAEMON);
 
 	ev_signal_init(&signal_usr1, sig_usr1, SIGUSR1);
         ev_signal_start(EV_DEFAULT_ &signal_usr1);
@@ -375,7 +375,7 @@ int main(int argc, char *argv[])
 
 	init_comm(EV_DEFAULT);
 
-	logx(LOG_NOTICE, "startup %s %s (pid %d)\n", _ident, _build, getpid());
+	logx(LOG_NOTICE, "startup %s %s", _ident, _build);
 
 	ev_run(EV_DEFAULT, 0);
 
