@@ -98,36 +98,6 @@ int sys_scan(const char *file, const char *fmt, ...)
 	return rc;
 }
 
-char *uci_get(const char *fmt, ...)
-{
-	FILE *pf;
-	int r;
-	va_list vlist;
-	char get[PATH_MAX] = "uci get ";
-	static char data[2048];
-
-	va_start(vlist, fmt);
-	vsnprintf(get + strlen(get), sizeof(get) - strlen(get), fmt, vlist);
-	va_end(vlist);
-
-	if (!(pf = popen(get, "r"))) {
-	       fprintf(stderr, "Could not open pipe for output.\n");
-	       return NULL;
-	}
-
-	if (!fgets(data, sizeof(data) , pf))
-		;
-	r = pclose(pf);
-	if (WEXITSTATUS(r) != 0) {
-		fprintf(stderr, "uci exit status: %d\n", WEXITSTATUS(r));
-		return NULL;
-	}
-
-	chomp(data);
-
-	return data;
-}
-
 typedef void (*DECODE_CB)(const char *name, uint32_t code, uint32_t vendor_id, void *data, size_t size, void *cb_data);
 
 static void new_var_list(void *ctx, struct var_list *list, size_t size)
@@ -262,7 +232,7 @@ decode_node_list(const char *prefix, DM2_AVPGRP *grp, DECODE_CB cb, void *cb_dat
 	return RC_OK;
 }
 
-/** apply the values from system.ntp.server list to the UCI configuration
+/** apply the values from system.ntp.server list to the systemd configuration
  *
  * NOTE: this version cut some corners, more carefull check are needed when/if
  *       the datamodel also supports TCP
@@ -321,7 +291,7 @@ listSystemNtp(DMCONTEXT *dmCtx)
 }
 
 
-/** apply the values from system.dns.server list to the UCI configuration
+/** apply the values from system.dns.server list to the systemd configuration
  *
  * NOTE: this version cut some corners, more carefull check are needed when/if
  *       the datamodel also supports TCP
@@ -455,7 +425,7 @@ listAuthentication(DMCONTEXT *dmCtx)
                 CB_ERR("Couldn't register LIST request.\n");
 }
 
-/** apply the values from system.dns.server list to the UCI configuration
+/** apply the values from interfaces.interface to the systemd configuration
  *
  * NOTE: this version cut some corners, more carefull check are needed when/if
  *       the datamodel also supports TCP
@@ -485,29 +455,9 @@ void if_ip_addr(const char *name, void *data, size_t size, struct ip_list *list)
 		inet_ntop(af, &addr, b, sizeof(b));
 		d->af = af;
 		d->address = talloc_strdup(list->ctx, b);
-	} else if (size != 0 && strncmp("netmask", s + 1, 7) == 0) {
-		struct ipaddr *d = list->ip + list->count - 1;
-
-		d->value = talloc_asprintf(list->ctx, data, size);
 	} else if (size != 0 && strncmp("prefix-length", s + 1, 13) == 0) {
 		struct ipaddr *d = list->ip + list->count - 1;
-
-		switch (d->af) {
-		case AF_INET: {
-			char b[INET_ADDRSTRLEN];
-			struct in_addr addr;
-
-			addr.s_addr = htonl(0xffffffff << (32 - dm_get_uint32_avp(data)));
-
-			inet_ntop(AF_INET, &addr, b, sizeof(b));
-			d->value = talloc_strdup(list->ctx, b);
-
-			break;
-		}
-		case AF_INET6:
-			d->value = talloc_asprintf(list->ctx, "%u", dm_get_uint32_avp(data));
-			break;
-		}
+		d->value = talloc_asprintf(list->ctx, "%u", dm_get_uint32_avp(data));
 	}
 }
 
@@ -788,7 +738,7 @@ uint32_t rpc_client_get_interface_state(void *ctx, const char *if_name, DM2_REQU
 
 	printf("rpc_client_get_interface_state: %s\n", if_name);
 
-	dev = wrt_ifname(if_name);
+	dev = if_name;
 
 	fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
 	if (fd == -1)
@@ -994,7 +944,9 @@ static uint32_t
 init_timezone(DMCONTEXT *dmCtx)
 {
 	uint32_t rc;
-	char *data = NULL;
+	FILE *fpipe;
+	char buffer[255];
+
 	struct rpc_db_set_path_value set_value = {
 		.path  = "system.clock.timezone-location",
 		.value = {
@@ -1003,14 +955,26 @@ init_timezone(DMCONTEXT *dmCtx)
 		},
 	};
 
-	data = uci_get("system.@system[0].zonename");
-	if (data && data[0]) {
-		set_value.value.data = data;
-		set_value.value.size = strlen(data);
+	fpipe = popen("timedatectl status", "r");
+	if (!fpipe)
+		return RC_ERR_MISC;
+
+	while (fgets(buffer, sizeof(buffer), fpipe)) {
+		char *p = strstr(buffer, "Time zone: ");
+
+		if (!p)
+			continue;
+		p += 11;
+
+		set_value.value.data = p;
+		set_value.value.size = strlen(p)-1;
 
 		if ((rc = rpc_db_set(dmCtx, 1, &set_value, NULL)) != RC_OK)
 			logx(LOG_WARNING, "Failed to report timezone, rc=%d.", rc);
+		break;
 	}
+
+	fclose(fpipe);
 
         if ((rc = rpc_param_notify(dmCtx, NOTIFY_ACTIVE, 1, &set_value.path, NULL)) != RC_OK) {
 		ev_break(dmCtx->ev, EVBREAK_ALL);
