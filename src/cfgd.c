@@ -46,8 +46,6 @@
 #include "cfgd.h"
 #include "comm.h"
 
-#define ROOT_HOME "/home/root"
-
 static const char _ident[] = "cfgd v" VERSION;
 static const char _build[] = "build on " __DATE__ " " __TIME__ " with gcc " __VERSION__;
 
@@ -140,15 +138,16 @@ void set_dns(const struct string_list *search, const struct string_list *servers
 	vsystem("systemctl reload-or-restart systemd-resolved");
 }
 
-void set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
+#if 0
+
+static void
+set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
 {
 	int i;
 	FILE *fout;
 	char *auth_file;
 
-	if (strcmp(name, "root") == 0) {
-		auth_file = strdup(ROOT_HOME "/.ssh/authorized_keys");
-	} else if (strcmp(name, "netconfd") == 0) {
+	if (strcmp(name, "netconfd") == 0) {
 		auth_file = strdup("/etc/netconf/authorized_keys");
 	} else {
 		struct passwd *pw;
@@ -177,6 +176,15 @@ void set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
  exit:
 	free(auth_file);
 }
+
+#else
+
+static void
+set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
+{
+}
+
+#endif
 
 void set_authentication(const struct auth_list *auth)
 {
