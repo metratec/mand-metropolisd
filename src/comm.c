@@ -565,7 +565,7 @@ if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
 static void
 ifListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *userdata)
 {
-	unsigned int flag = *(unsigned int *)userdata;
+	unsigned int flag = (unsigned int)(size_t)userdata;
 	uint32_t rc, answer_rc;
 	struct interface_list info;
 
@@ -590,7 +590,8 @@ ifListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *u
 static void
 listInterfaces(DMCONTEXT *dmCtx, unsigned int flags)
 {
-	if (rpc_db_list_async(dmCtx, 16, "interfaces.interface", ifListReceived, &flags))
+	if (rpc_db_list_async(dmCtx, 0, "interfaces.interface", ifListReceived,
+	                      (void *)(size_t)flags))
 	        CB_ERR("Couldn't register LIST request.\n");
 }
 
@@ -604,9 +605,9 @@ request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 	req.end2end = dm_end2end_id(pkt);
 	req.code = dm_packet_code(pkt);
 
-#ifdef LIBDMCONFIG_DEBUG
-	logx(LOG_DEBUG, "Received %s:",
+	logx(LOG_DEBUG, "request_cb: received %s",
 	     dm_packet_flags(pkt) & CMD_FLAG_REQUEST ? "request" : "answer");
+#ifdef LIBDMCONFIG_DEBUG
 	dump_dm_packet(pkt);
 #endif
 
@@ -987,7 +988,7 @@ init_timezone(DMCONTEXT *dmCtx)
 	struct rpc_db_set_path_value set_value = {
 		.path  = "system.clock.timezone-location",
 		.value = {
-			.code = AVP_UNKNOWN,
+			.code = AVP_ENUM,
 			.vendor_id = VP_TRAVELPING,
 		},
 	};
@@ -997,14 +998,19 @@ init_timezone(DMCONTEXT *dmCtx)
 		return RC_ERR_MISC;
 
 	while (fgets(buffer, sizeof(buffer), fpipe)) {
-		char *p = strstr(buffer, "Time zone: ");
+		char *tz = strstr(buffer, "Time zone: ");
+		char *p;
 
-		if (!p)
+		if (!tz)
 			continue;
-		p += 11;
+		tz += 11;
 
-		set_value.value.data = p;
-		set_value.value.size = strlen(p)-1;
+		p = strchr(tz, ' ');
+		if (p)
+			*p = '\0';
+
+		set_value.value.data = tz;
+		set_value.value.size = strlen(tz);
 
 		if ((rc = rpc_db_set(dmCtx, 1, &set_value, NULL)) != RC_OK)
 			logx(LOG_WARNING, "Failed to report timezone, rc=%d.", rc);
@@ -1058,6 +1064,9 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	if (init_timezone(dmCtx) != RC_OK)
 		logx(LOG_WARNING, "Initial update of Timezone failed.");
 
+	/*
+	 * FIXME: NTP servers not yet supported
+	 */
 	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "system.ntp.server", NULL)) != RC_OK) {
 		ev_break(dmCtx->ev, EVBREAK_ALL);
 		CB_ERR_RET(rc, "Couldn't register RECURSIVE PARAM NOTIFY request, rc=%d.", rc);
