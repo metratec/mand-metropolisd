@@ -70,6 +70,7 @@ struct if_ip {
 	uint32_t mtu;
 	struct ip_list addr;
 	struct ip_list neigh;
+	struct ip_list gateway;
 };
 
 struct if_dhcp {

@@ -249,6 +249,12 @@ void set_if_addr(struct interface_list *info)
 			fprintf(fout, "[Link]\n"
 			              "MTUBytes=%u\n", mtu);
 
+		fputs("[Route]\n", fout);
+		for (int j = 0; j < iface->ipv4.gateway.count; j++)
+			fprintf(fout, "Gateway=%s\n", iface->ipv4.gateway.ip[j].address);
+		for (int j = 0; j < iface->ipv6.gateway.count; j++)
+			fprintf(fout, "Gateway=%s\n", iface->ipv6.gateway.ip[j].address);
+
 		fclose(fout);
 	}
 

@@ -496,6 +496,21 @@ if_ip_neigh(const char *name, void *data, size_t size, struct ip_list *list)
 }
 
 static void
+if_ip_gateway(void *data, size_t size, struct ip_list *list)
+{
+	char b[INET6_ADDRSTRLEN];
+	struct in6_addr addr;
+	struct ipaddr *d;
+
+	if (!(d = add_var_list((struct var_list *)list, sizeof(struct ipaddr))))
+		return;
+
+	dm_get_address_avp(&d->af, &addr, sizeof(addr), data, size);
+	inet_ntop(d->af, &addr, b, sizeof(b));
+	d->address = talloc_strdup(list->ctx, b);
+}
+
+static void
 if_ip(const char *name, void *data, size_t size, struct if_ip *if_ip)
 {
 	if (strncmp("enabled", name, 7) == 0) {
@@ -508,6 +523,12 @@ if_ip(const char *name, void *data, size_t size, struct if_ip *if_ip)
 		if_ip_addr(name + 8, data, size, &if_ip->addr);
 	} else if (strncmp("neighbor", name, 8) == 0) {
 		if_ip_neigh(name + 9, data, size, &if_ip->neigh);
+	} else if (strncmp("gateway-ip", name, 10) == 0) {
+		/*
+		 * NOTE: gateway-ip is a Metropolis extension.
+		 * It is an array of IPv4/v6 addresses.
+		 */
+		if_ip_gateway(data, size, &if_ip->gateway);
 	}
 }
 
@@ -540,8 +561,10 @@ if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
 
 		new_var_list(info->ctx, (struct var_list *)&d->ipv4.addr, sizeof(struct ip_list));
 		new_var_list(info->ctx, (struct var_list *)&d->ipv4.neigh, sizeof(struct ip_list));
+		new_var_list(info->ctx, (struct var_list *)&d->ipv4.gateway, sizeof(struct ip_list));
 		new_var_list(info->ctx, (struct var_list *)&d->ipv6.addr, sizeof(struct ip_list));
 		new_var_list(info->ctx, (struct var_list *)&d->ipv6.neigh, sizeof(struct ip_list));
+		new_var_list(info->ctx, (struct var_list *)&d->ipv6.gateway, sizeof(struct ip_list));
 
 		d->name = talloc_strndup(info->ctx, data, size);
 
@@ -668,6 +691,11 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	return dm_expect_end(obj);
 }
 
+/*
+ * NOTE: Event broadcasts are dispatched by mand's "action" mechanism.
+ * Yang extensions are used to declare which parameter triggers which
+ * action and the ordering of actions.
+ */
 uint32_t rpc_client_event_broadcast(void *ctx, const char *path, uint32_t type)
 {
 	logx(LOG_DEBUG, "Event: %d on \"%s\"", type, path);
