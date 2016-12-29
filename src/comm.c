@@ -289,6 +289,47 @@ listSystemNtp(DMCONTEXT *dmCtx)
 	        CB_ERR("Couldn't register LIST request.\n");
 }
 
+static void
+ptpGetReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+               void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+	char *ptp_state;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get \"system.ptp.state\", ev=%d.\n", event);
+
+	/*
+	 * This depends on the metropolis-ptp Yang module,
+	 * which is not in every Metropolis build.
+	 * Therefore we handle errors gracefully.
+	 */
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK) {
+	        logx(LOG_INFO, "Couldn't get \"system.ptp.state\", rc=%d,%d.\n", rc, answer_rc);
+		return;
+	}
+
+	if ((rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &ptp_state)) != RC_OK ||
+	    (rc = dm_expect_group_end(grp)) != RC_OK)
+		CB_ERR("Couldn't decode GET request, rc=%d", rc);
+
+	set_ptp_state(ptp_state);
+}
+
+static void
+listSystemPtp(DMCONTEXT *dmCtx)
+{
+	static const char *paths[] = {
+		"system.ptp.state"
+	};
+
+	uint32_t rc;
+
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths, ptpGetReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't get \"system.ptp.state\", rc=%d", rc);
+}
 
 /** apply the values from system.dns.server list to the systemd configuration
  *
@@ -678,7 +719,10 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 				CB_ERR_RET(rc, "Couldn't decode parameter changed notifications, rc=%d\n", rc);
 
 	                logx(LOG_DEBUG, "Notification: Parameter \"%s\" changed to \"%s\"\n", path, str);
-			set_value(path, str);
+			if (!strcmp(path, "system.ptp.state"))
+				set_ptp_state(str);
+			else
+				set_value(path, str);
 
 			break;
 	        }
@@ -1093,21 +1137,20 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 		logx(LOG_WARNING, "Initial update of Timezone failed.");
 
 	/*
-	 * FIXME: NTP servers not yet supported
+	 * This requires the custom metropolis-ptp Yang module.
+	 * It is not part of the Metropolis base profile, so we must be prepared to handle
+	 * missing nodes.
+	 * This helps to avoid a new image-specific compile-time option.
+	 *
+	 * NOTE: PTP does not have its own action table.
 	 */
-	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "system.ntp.server", NULL)) != RC_OK) {
-		ev_break(dmCtx->ev, EVBREAK_ALL);
-		CB_ERR_RET(rc, "Couldn't register RECURSIVE PARAM NOTIFY request, rc=%d.", rc);
-	}
-
-	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "system.dns-resolver", NULL)) != RC_OK) {
-		ev_break(dmCtx->ev, EVBREAK_ALL);
-		CB_ERR_RET(rc, "Couldn't register RECURSIVE PARAM NOTIFY request, rc=%d.", rc);
-	}
+	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "system.ptp", NULL)) != RC_OK)
+		logx(LOG_INFO, "Cannot register recursive notification for \"system.ptp\", rc=%d.", rc);
 
 	logx(LOG_DEBUG, "RECURSIVE PARAM NOTIFY request registered.");
 
 	listSystemNtp(dmCtx);
+	listSystemPtp(dmCtx);
 	listSystemDns(dmCtx);
 	listAuthentication(dmCtx);
 	listInterfaces(dmCtx, IF_IP | IF_NEIGH);

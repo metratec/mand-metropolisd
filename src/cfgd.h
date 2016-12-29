@@ -91,6 +91,7 @@ struct interface_list {
 };
 
 void set_ntp_server(const struct ntp_servers *servers);
+void set_ptp_state(const char *state);
 void set_dns(const struct string_list *search, const struct string_list *servers);
 void set_authentication(const struct auth_list *auth);
 void set_if_addr(struct interface_list *info);
