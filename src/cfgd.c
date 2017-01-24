@@ -177,7 +177,15 @@ void set_dns(const struct string_list *search, const struct string_list *servers
 		fputs(servers->s[i], fout);
 	}
 
-	fputs("\nDomains =", fout);
+	/*
+	 * FIXME: The "Domains" key is not supported by systemd 219.
+	 * The only other way to specify them would be to include
+	 * them in the /etc/systemd/network files.
+	 * However, in systemd 219, it is not possible to use "drop-in"
+	 * files to extend the config written by set_if_addr().
+	 * Therefore we disable search-domain support for the time being.
+	 */
+	fputs("\n#Domains =", fout);
 	for (int i = 0; i < search->count; i++) {
 		fputc(' ', fout);
 		fputs(search->s[i], fout);
