@@ -46,6 +46,13 @@
 #include "cfgd.h"
 #include "comm.h"
 
+/**
+ * The prefix of the systemd config directory.
+ * Since systemd files are managed by mand-metropolisd,
+ * all files written by it can be in the volatile filesystem.
+ */
+#define SYSTEMD_PREFIX "/run/systemd"
+
 static const char _build[] = "build on " __DATE__ " " __TIME__ " with gcc " __VERSION__;
 
 static int vsystem(const char *cmd);
@@ -84,7 +91,7 @@ void set_ntp_server(const struct ntp_servers *servers)
 {
 	FILE *fout;
 
-	fout = fopen("/etc/systemd/timesyncd.conf", "w");
+	fout = fopen(SYSTEMD_PREFIX "/timesyncd.conf", "w");
 	if (!fout) {
 		/* FIXME: Error handling */
 		return;
@@ -163,7 +170,7 @@ void set_dns(const struct string_list *search, const struct string_list *servers
 {
 	FILE *fout;
 
-	fout = fopen("/etc/systemd/resolved.conf", "w");
+	fout = fopen(SYSTEMD_PREFIX "/resolved.conf", "w");
 	if (!fout) {
 		/* FIXME: Error handling */
 		return;
@@ -180,7 +187,7 @@ void set_dns(const struct string_list *search, const struct string_list *servers
 	/*
 	 * FIXME: The "Domains" key is not supported by systemd 219.
 	 * The only other way to specify them would be to include
-	 * them in the /etc/systemd/network files.
+	 * them in the .../systemd/network files.
 	 * However, in systemd 219, it is not possible to use "drop-in"
 	 * files to extend the config written by set_if_addr().
 	 * Therefore we disable search-domain support for the time being.
@@ -277,7 +284,8 @@ void set_if_addr(struct interface_list *info)
 	 * interfaces in a single *.network file, so we create one
 	 * file per interface.
 	 */
-	vsystem("rm -f /etc/systemd/network/*.network");
+	vsystem("rm -rf " SYSTEMD_PREFIX "/network");
+	vsystem("mkdir -p " SYSTEMD_PREFIX "/network");
 
 	for (int i = 0; i < info->count; i++) {
 		struct interface *iface = info->iface + i;
@@ -287,7 +295,8 @@ void set_if_addr(struct interface_list *info)
 		uint32_t mtu;
 
 		snprintf(systemd_cfg, sizeof(systemd_cfg),
-		         "/etc/systemd/network/%s.network", iface->name);
+		         "%s/network/%s.network",
+		         SYSTEMD_PREFIX, iface->name);
 		fout = fopen(systemd_cfg, "w");
 		if (!fout) {
 			/* FIXME: Error handling? */
