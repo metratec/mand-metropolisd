@@ -101,10 +101,10 @@ void set_ntp_server(const struct ntp_servers *servers)
 	fclose(fout);
 
 	/*
-	 * In case systemd-timesyncd is already running,
-	 * we make sure it reloads its configuration.
+	 * This seems to be the only way to enforce a reload
+	 * of the NTP configuration.
 	 */
-	vsystem("systemctl stop systemd-timesyncd");
+	vsystem("timedatectl set-ntp 0");
 	vasystem("timedatectl set-ntp %d", servers->enabled);
 }
 
