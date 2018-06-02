@@ -2,6 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -15,6 +19,7 @@
 #include <sys/tree.h>
 #include <sys/queue.h>
 #include <sys/ioctl.h>
+#include <net/if.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <ctype.h>
@@ -29,7 +34,6 @@
 
 #include <ev.h>
 
-#include "config.h"
 #include <mand/logx.h>
 #include <mand/binary.h>
 
