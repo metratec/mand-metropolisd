@@ -664,6 +664,48 @@ listInterfaces(DMCONTEXT *dmCtx, unsigned int flags)
 }
 
 static void
+autoIdGetReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+                  void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+	uint8_t autoid_enabled;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get \"pulsarlr.autoid-enabled\", ev=%d.\n", event);
+
+	/*
+	 * This depends on the metropolis-pulsarlr Yang module,
+	 * which is not in every Metropolis build.
+	 * Therefore we handle errors gracefully.
+	 */
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK) {
+	        logx(LOG_INFO, "Couldn't get \"pulsarlr.autoid-enabled\", rc=%d,%d.\n", rc, answer_rc);
+		return;
+	}
+
+	if ((rc = dm_expect_uint8_type(grp, AVP_BOOL, VP_TRAVELPING, &autoid_enabled)) != RC_OK ||
+	    (rc = dm_expect_group_end(grp)) != RC_OK)
+		CB_ERR("Couldn't decode GET request, rc=%d", rc);
+
+	set_autoid_enabled(autoid_enabled);
+}
+
+static void
+listAutoId(DMCONTEXT *dmCtx)
+{
+	static const char *paths[] = {
+		"pulsarlr.autoid-enabled"
+	};
+
+	uint32_t rc;
+
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths, autoIdGetReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't get \"%s\", rc=%d", paths[0], rc);
+}
+
+static void
 request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 {
 	DMC_REQUEST req;
@@ -725,6 +767,8 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	                logx(LOG_DEBUG, "Notification: Parameter \"%s\" changed to \"%s\"\n", path, str);
 			if (!strcmp(path, "system.ptp.state"))
 				set_ptp_state(str);
+			else if (!strcmp(path, "pulsarlr.autoid-enabled"))
+				set_autoid_enabled(strcmp(str, "true") == 0);
 			else
 				set_value(path, str);
 
@@ -1150,14 +1194,25 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	 */
 	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "system.ptp", NULL)) != RC_OK)
 		logx(LOG_INFO, "Cannot register recursive notification for \"system.ptp\", rc=%d.", rc);
-
 	logx(LOG_DEBUG, "RECURSIVE PARAM NOTIFY request registered.");
 
+	/*
+	 * Requires the custom metropolis-pulsarlr Yang module.
+	 */
+	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "pulsarlr", NULL)) != RC_OK)
+		logx(LOG_INFO, "Cannot register recursive notification for \"pulsarlr\", rc=%d.", rc);
+	logx(LOG_DEBUG, "RECURSIVE PARAM NOTIFY request registered.");
+
+	/*
+	 * NOTE: Beginning with the first asynchronous method call, we must no longer
+	 * call synchronous versions.
+	 */
 	listSystemNtp(dmCtx);
 	listSystemPtp(dmCtx);
 	listSystemDns(dmCtx);
 	listAuthentication(dmCtx);
 	listInterfaces(dmCtx, IF_IP | IF_NEIGH);
+	listAutoId(dmCtx);
 
 	return RC_OK;
 }
