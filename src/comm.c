@@ -706,6 +706,100 @@ listAutoId(DMCONTEXT *dmCtx)
 }
 
 static void
+sparkplugReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+                  void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get remaining Sparkplug parameters, ev=%d.\n", event);
+
+	/*
+	 * NOTE: We don't get here unless the previous GET was successful,
+	 * so we know we've got the necessary metropolis-sparkplug Yang module.
+	 */
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK)
+		CB_ERR("Couldn't get remaining Sparkplug parameters, rc=%d,%d.\n",
+		       rc, answer_rc);
+
+	char *host, *username, *password;
+	/*
+	 * FIXME: sparkplug.server.X.port is currently AVP_UINT32.
+	 * This could change in the future.
+	 */
+	uint32_t port;
+
+	if ((rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &host)) != RC_OK ||
+	    (rc = dm_expect_uint32_type(grp, AVP_UINT32, VP_TRAVELPING, &port)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &username)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &password)) != RC_OK ||
+	    (rc = dm_expect_group_end(grp)) != RC_OK)
+		CB_ERR("Couldn't decode GET request, rc=%d", rc);
+
+	set_mosquitto(host, port, username, password);
+}
+
+static void
+sparkplugCurrentServerReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+                               void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get \"sparkplug.current-server\", ev=%d.\n", event);
+
+	/*
+	 * This depends on the metropolis-sparkplug Yang module,
+	 * which is not in every Metropolis build.
+	 * Therefore we handle errors gracefully.
+	 */
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK) {
+	        logx(LOG_INFO, "Couldn't get \"sparkplug.current-server\", rc=%d,%d.\n",
+		     rc, answer_rc);
+		return;
+	}
+
+	char *current_server;
+
+	if ((rc = dm_expect_string_type(grp, AVP_PATH, VP_TRAVELPING, &current_server)) != RC_OK ||
+	    (rc = dm_expect_group_end(grp)) != RC_OK)
+		CB_ERR("Couldn't decode GET request, rc=%d", rc);
+
+	char path_host[256], path_port[256];
+	strcat(strcpy(path_host, current_server), ".host");
+	strcat(strcpy(path_port, current_server), ".port");
+
+	const char *paths[] = {
+		path_host, /* sparkplug.server.X.host */
+		path_port, /* sparkplug.server.X.port */
+		"sparkplug.username",
+		"sparkplug.password"
+	};
+
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
+	                      sparkplugReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't get remaining Sparkplug parameters, rc=%d", rc);
+}
+
+static void
+listSparkplug(DMCONTEXT *dmCtx)
+{
+	static const char *paths[] = {
+		"sparkplug.current-server"
+	};
+
+	uint32_t rc;
+
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
+	                      sparkplugCurrentServerReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't get \"%s\", rc=%d", paths[0], rc);
+}
+
+static void
 request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 {
 	DMC_REQUEST req;
@@ -735,6 +829,7 @@ request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 {
 	uint32_t rc;
+	bool sparkplug_changed = false;
 
 	do {
 		DM2_AVPGRP grp;
@@ -778,7 +873,16 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	                logx(LOG_DEBUG, "Notification: Warning, unknown type: %d\n", type);
 			break;
 		}
+
+		sparkplug_changed |= strncmp(path, "sparkplug.", 10) == 0;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
+
+	/*
+	 * For simplicity, we don't try to parse the notification payload for
+	 * sparkplug.* parameters.
+	 */
+	if (sparkplug_changed)
+		listSparkplug(ctx);
 
 	return dm_expect_end(obj);
 }
@@ -1185,23 +1289,27 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 		logx(LOG_WARNING, "Initial update of Timezone failed.");
 
 	/*
-	 * This requires the custom metropolis-ptp Yang module.
+	 * This requires the optional metropolis-ptp Yang module.
 	 * It is not part of the Metropolis base profile, so we must be prepared to handle
 	 * missing nodes.
 	 * This helps to avoid a new image-specific compile-time option.
 	 *
 	 * NOTE: PTP does not have its own action table.
 	 */
-	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "system.ptp", NULL)) != RC_OK)
-		logx(LOG_INFO, "Cannot register recursive notification for \"system.ptp\", rc=%d.", rc);
-	logx(LOG_DEBUG, "RECURSIVE PARAM NOTIFY request registered.");
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "system.ptp", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"system.ptp\", rc=%d.", rc);
 
 	/*
-	 * Requires the custom metropolis-pulsarlr Yang module.
+	 * Requires the optional metropolis-pulsarlr Yang module.
 	 */
-	if ((rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "pulsarlr", NULL)) != RC_OK)
-		logx(LOG_INFO, "Cannot register recursive notification for \"pulsarlr\", rc=%d.", rc);
-	logx(LOG_DEBUG, "RECURSIVE PARAM NOTIFY request registered.");
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "pulsarlr", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"pulsarlr\", rc=%d.", rc);
+
+	/*
+	 * Requires the optional metropolis-sparkplug Yang module.
+	 */
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "sparkplug", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"sparkplug\", rc=%d.", rc);
 
 	/*
 	 * NOTE: Beginning with the first asynchronous method call, we must no longer
@@ -1213,6 +1321,7 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	listAuthentication(dmCtx);
 	listInterfaces(dmCtx, IF_IP | IF_NEIGH);
 	listAutoId(dmCtx);
+	listSparkplug(dmCtx);
 
 	return RC_OK;
 }
