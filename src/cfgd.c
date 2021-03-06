@@ -395,9 +395,9 @@ void set_if_neigh(struct interface_list *info)
 
 void set_autoid_enabled(bool enabled)
 {
-	FILE *fout = fopen("/etc/default/indy-chip-ascii-server", "w");
+	FILE *fout = fopen("/var/run/indy-chip-ascii-server.conf", "w");
 	if (!fout) {
-		logx(LOG_ERR, "Cannot open /etc/default/indy-chip-ascii-server for writing: %s",
+		logx(LOG_ERR, "Cannot open /var/run/indy-chip-ascii-server.conf for writing: %s",
 		     strerror(errno));
 		return;
 	}
@@ -427,7 +427,7 @@ void set_mosquitto(const char *host, uint16_t port,
 		return;
 	}
 
-	FILE *fout = fopen("/etc/mosquitto/mosquitto.conf", "w");
+	FILE *fout = fopen("/var/run/mosquitto.conf", "w");
 	if (!fout) {
 		logx(LOG_ERR, "Cannot open mosquitto.conf for writing: %s",
 		     strerror(errno));
