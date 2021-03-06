@@ -69,6 +69,14 @@ PKG_CHECK_MODULES([LIBNL3], [libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8])
 AC_SUBST([LIBNL3_LIBS])
 AC_SUBST([LIBNL3_CFLAGS])
 
+AC_ARG_ENABLE(debug-tweaks,
+        AS_HELP_STRING([--enable-debug-tweaks],
+                       [Enable insecure debug tweaks [default=no]]),
+        [debug_tweaks=$enableval], [debug_tweaks=no])
+if [[ $debug_tweaks = yes ]]; then
+	AC_DEFINE(DEBUG_TWEAKS, 1, [Enable insecure debug tweaks])
+fi
+
 AC_CONFIG_FILES([
         Makefile
         src/Makefile
