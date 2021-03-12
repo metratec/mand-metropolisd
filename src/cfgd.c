@@ -460,8 +460,8 @@ void set_mosquitto(const char *host, uint16_t port,
 	        "topic spBv1.0/+/DDATA/# out 1\n"
 	        "topic spBv1.0/+/NDEATH/# out 1\n"
 	        "topic spBv1.0/+/DDEATH/# out 1\n"
-	        "topic spBv1.0/+/NCMD/# in 1\n"
-	        "topic spBv1.0/+/NCMD/# in 1\n"
+	        "topic spBv1.0/+/NCMD/# in 2\n"
+	        "topic spBv1.0/+/DCMD/# in 2\n"
 	        /*
 	         * We assume that we can only receive STATE messages from the backend server
 	         * we're bridging to.
