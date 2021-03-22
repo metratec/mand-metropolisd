@@ -800,6 +800,75 @@ listSparkplug(DMCONTEXT *dmCtx)
 }
 
 static void
+wwanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+             void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get WWAN parameters, ev=%d.\n", event);
+
+	/*
+	 * NOTE: We don't get here unless the previous GET was successful,
+	 * so we know we've got the necessary metropolis-sparkplug Yang module.
+	 */
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK)
+		CB_ERR("Couldn't get WWAN parameters, rc=%d,%d.\n",
+		       rc, answer_rc);
+
+	uint8_t enabled;
+	char *apn, *pin, *lte_mode;
+	DM2_AVPGRP lte_bands_grp;
+
+	if ((rc = dm_expect_uint8_type(grp, AVP_BOOL, VP_TRAVELPING, &enabled)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &apn)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &pin)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &lte_mode)) != RC_OK ||
+	    (rc = dm_expect_group(grp, AVP_ARRAY, VP_TRAVELPING, &lte_bands_grp)) != RC_OK ||
+	    (rc = dm_expect_group_end(grp)) != RC_OK)
+		CB_ERR("Couldn't decode GET request, rc=%d", rc);
+
+	unsigned int i = 0;
+	uint8_t lte_bands[32];
+	uint32_t band;
+	/*
+	 * FIXME: The band is currently an AVP_UINT32.
+	 * This might change in the future.
+	 */
+	while (i < sizeof(lte_bands)-1 &&
+	       dm_expect_uint32_type(&lte_bands_grp, AVP_UINT32, VP_TRAVELPING, &band) == RC_OK)
+		lte_bands[i++] = band;
+	lte_bands[i] = 0;
+	if (i == sizeof(lte_bands)-1)
+	        logx(LOG_ERR, "Too many WWAN bands specified");
+
+	if (enabled)
+		set_wwan(apn, pin, lte_mode, lte_bands);
+	else if (system("systemctl stop metropolis-wwan") < 0)
+		logx(LOG_ERR, "Cannot disable WWAN connection");
+}
+
+static void
+listWWAN(DMCONTEXT *dmCtx)
+{
+	static const char *paths[] = {
+		"wwan.enabled",
+		"wwan.apn",
+		"wwan.pin",
+		"wwan.lte.mode",
+		"wwan.lte.band"
+	};
+
+	uint32_t rc;
+
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
+	                      wwanReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't get WWAN parameters, rc=%d", rc);
+}
+
+static void
 request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 {
 	DMC_REQUEST req;
@@ -830,6 +899,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 {
 	uint32_t rc;
 	bool sparkplug_changed = false;
+	bool wwan_changed = false;
 
 	do {
 		DM2_AVPGRP grp;
@@ -875,6 +945,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		}
 
 		sparkplug_changed |= strncmp(path, "sparkplug.", 10) == 0;
+		wwan_changed |= strncmp(path, "wwan.", 5) == 0;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
 
 	/*
@@ -883,6 +954,8 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	 */
 	if (sparkplug_changed)
 		listSparkplug(ctx);
+	if (wwan_changed)
+		listWWAN(ctx);
 
 	return dm_expect_end(obj);
 }
@@ -1313,6 +1386,12 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	logx(LOG_INFO, "Registered recursive notification for \"sparkplug\", rc=%d.", rc);
 
 	/*
+	 * Requires the optional metropolis-wwan Yang module.
+	 */
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "wwan", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"wwan\", rc=%d.", rc);
+
+	/*
 	 * NOTE: Beginning with the first asynchronous method call, we must no longer
 	 * call synchronous versions.
 	 */
@@ -1323,6 +1402,7 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	listInterfaces(dmCtx, IF_IP | IF_NEIGH);
 	listAutoId(dmCtx);
 	listSparkplug(dmCtx);
+	listWWAN(dmCtx);
 
 	return RC_OK;
 }
