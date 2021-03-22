@@ -1004,7 +1004,8 @@ uint32_t rpc_client_get_interface_state(void *ctx, const char *if_name, DM2_REQU
 	if (fd == -1)
 		return RC_ERR_MISC;
 
-	strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+	strncpy(ifr.ifr_name, dev, IFNAMSIZ-1);
+	ifr.ifr_name[IFNAMSIZ-1] = '\0';
 
 	if ((rc = if_ioctl(fd, SIOCGIFINDEX, &ifr)) != RC_OK)
 		return rc;
