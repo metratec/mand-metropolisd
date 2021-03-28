@@ -345,16 +345,30 @@ void set_if_addr(struct interface_list *info)
 				        iface->ipv6.addr.ip[j].address, iface->ipv6.addr.ip[j].value);
 		}
 
-		fputs("[Route]\n", fout);
+#if 0
+		/*
+		 * A high route metric ensures a low priority of the default routes.
+		 * This ensures that any WWAN connection's rules will have a
+		 * higher priority, so traffic goes through the ethernet interface
+		 * only as a fallback.
+		 */
+		fputs("[DHCP]\n"
+		      "RouteMetric=4096\n", fout);
+#endif
 
-		if (iface->ipv4.enabled && !iface->dhcp.enabled) {
-			for (int j = 0; j < iface->ipv4.gateway.count; j++)
-				fprintf(fout, "Gateway=%s\n", iface->ipv4.gateway.ip[j].address);
-		}
+		if (!iface->dhcp.enabled && (iface->ipv4.enabled || iface->ipv6.enabled)) {
+			fputs("[Route]\n"
+			      /*"Metric=4096\n"*/, fout);
 
-		if (iface->ipv6.enabled && !iface->dhcp.enabled) {
-			for (int j = 0; j < iface->ipv6.gateway.count; j++)
-				fprintf(fout, "Gateway=%s\n", iface->ipv6.gateway.ip[j].address);
+			if (iface->ipv4.enabled) {
+				for (int j = 0; j < iface->ipv4.gateway.count; j++)
+					fprintf(fout, "Gateway=%s\n", iface->ipv4.gateway.ip[j].address);
+			}
+
+			if (iface->ipv6.enabled) {
+				for (int j = 0; j < iface->ipv6.gateway.count; j++)
+					fprintf(fout, "Gateway=%s\n", iface->ipv6.gateway.ip[j].address);
+			}
 		}
 
 		/*
