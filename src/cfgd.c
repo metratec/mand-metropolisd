@@ -498,8 +498,23 @@ void set_mosquitto(const char *host, uint16_t port,
 	vsystem("systemctl restart mosquitto");
 }
 
+static inline bool validate_at_param(const char *str)
+{
+	return str && !strpbrk(str, "\n\r\",");
+}
+
 void set_wwan(const char *apn, const char *pin, const char *lte_mode, const uint8_t *lte_bands)
 {
+	/*
+	 * NOTE: It is apparently not possible to escape special characters in
+	 * AT commands and mand does also not allow us to prevent sets with invalid characters.
+	 * Therefore we guard against "AT command insertion" by aborting.
+	 */
+	if (!validate_at_param(apn) || (pin && *pin && !validate_at_param(pin))) {
+		logx(LOG_ERR, "APN and/or PIN are malformed");
+		return;
+	}
+
 	FILE *fout = fopen("/var/run/sim7070-chat.dat", "w");
 	if (!fout) {
 		logx(LOG_ERR, "Cannot open sim7070-chat.dat for writing: %s",
