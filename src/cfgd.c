@@ -503,7 +503,8 @@ static inline bool validate_at_param(const char *str)
 	return str && !strpbrk(str, "\n\r\",");
 }
 
-void set_wwan(const char *apn, const char *pin, const char *lte_mode, const uint8_t *lte_bands)
+void set_wwan(const char *apn, const char *pin, const char *mode, const char *lte_mode,
+              const uint8_t *lte_bands)
 {
 	/*
 	 * NOTE: It is apparently not possible to escape special characters in
@@ -522,6 +523,17 @@ void set_wwan(const char *apn, const char *pin, const char *lte_mode, const uint
 		return;
 	}
 
+	unsigned int mode_id = 2;
+
+	if (!strcmp(mode, "automatic"))
+		mode_id = 2;
+	else if (!strcmp(mode, "gsm"))
+		mode_id = 13;
+	else if (!strcmp(mode, "lte"))
+		mode_id = 38;
+	else if (!strcmp(mode, "gsm-and-lte"))
+		mode_id = 51;
+
 	unsigned int lte_mode_id = 3;
 
 	if (!strcmp(lte_mode, "cat-m"))
@@ -538,14 +550,13 @@ void set_wwan(const char *apn, const char *pin, const char *lte_mode, const uint
 	        "ABORT 'ERROR'\n"
 	        "ABORT 'NO ANSWER'\n"
 	        "ABORT 'BUSY'\n"
-	        "TIMEOUT 120\n"
+	        "TIMEOUT 5\n"
 	        "'' AT\n"
 	        "OK ATE1\n"
 	        "OK AT+CGDCONT=1,\"IPV4V6\",\"%s\"\n"
-	        /* Automatic selection between GSM and LTE */
-	        "OK AT+CNMP=2\n"
+	        "OK AT+CNMP=%u\n"
 	        "OK AT+CMNB=%u\n",
-	        PACKAGE_STRING, apn, lte_mode_id);
+	        PACKAGE_STRING, apn, mode_id, lte_mode_id);
 	if (pin && *pin)
 		fprintf(fout, "OK AT+CPIN=%s\n", pin);
 	if (lte_bands) {

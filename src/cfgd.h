@@ -99,7 +99,8 @@ void set_autoid_enabled(bool enabled);
 void set_mosquitto(const char *host, uint16_t port,
                    const char *username, const char *password);
 void set_wwan(const char *apn, const char *pin,
-              const char *lte_mode, const uint8_t *lte_bands);
+              const char *mode, const char *lte_mode,
+              const uint8_t *lte_bands);
 void set_dns(const struct string_list *search, const struct string_list *servers);
 void set_authentication(const struct auth_list *auth);
 void set_if_addr(struct interface_list *info);

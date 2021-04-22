@@ -818,12 +818,13 @@ wwanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 		       rc, answer_rc);
 
 	uint8_t enabled;
-	char *apn, *pin, *lte_mode;
+	char *apn, *pin, *mode, *lte_mode;
 	DM2_AVPGRP lte_bands_grp;
 
 	if ((rc = dm_expect_uint8_type(grp, AVP_BOOL, VP_TRAVELPING, &enabled)) != RC_OK ||
 	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &apn)) != RC_OK ||
 	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &pin)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &mode)) != RC_OK ||
 	    (rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &lte_mode)) != RC_OK ||
 	    (rc = dm_expect_group(grp, AVP_ARRAY, VP_TRAVELPING, &lte_bands_grp)) != RC_OK ||
 	    (rc = dm_expect_group_end(grp)) != RC_OK)
@@ -844,7 +845,7 @@ wwanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 	        logx(LOG_ERR, "Too many WWAN bands specified");
 
 	if (enabled)
-		set_wwan(apn, pin, lte_mode, lte_bands);
+		set_wwan(apn, pin, mode, lte_mode, lte_bands);
 	else if (system("systemctl stop metropolis-wwan") < 0)
 		logx(LOG_ERR, "Cannot disable WWAN connection");
 }
@@ -856,6 +857,7 @@ listWWAN(DMCONTEXT *dmCtx)
 		"wwan.enabled",
 		"wwan.apn",
 		"wwan.pin",
+		"wwan.mode",
 		"wwan.lte.mode",
 		"wwan.lte.band"
 	};
