@@ -15,6 +15,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/sysinfo.h>
 #include <sys/time.h>
 #include <sys/tree.h>
 #include <sys/queue.h>
@@ -73,6 +74,8 @@
 	        *c-- = '\0'; \
 	s; \
 })
+
+#define MEGABYTE (1024U * 1024U)
 
 static int sys_scan(const char *file, const char *fmt, ...)
 {
@@ -1327,6 +1330,119 @@ init_timezone(DMCONTEXT *dmCtx)
 	return RC_OK;
 }
 
+/**
+ * Timer used to periodically report monitored system parameters.
+ */
+static ev_timer monitoring_timer;
+
+/**
+ * Reports monitored system information.
+ * 
+ * @param dmCtx The libdmconfig context.
+ * @param report_total If total memory size should be reported or not.
+ * @return According dmconfig RC.
+ * 
+ * Currently CPU und RAM usage get reported.
+ * In future maybe temperatures will be reported.
+ */
+static uint32_t
+report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
+{
+	struct sysinfo info;
+	uint64_t si_total, si_free;
+	uint32_t mem_used, mem_total, mem_free_perc, rc;
+
+	if (sysinfo(&info) != 0) {
+		logx(LOG_WARNING, "Failed to read sysinfo: %s.",
+		     strerror(errno));
+		return RC_ERR_MISC;
+	}
+
+	si_total = (uint64_t) info.totalram * (uint64_t) info.mem_unit;
+	si_free  = (uint64_t) info.freeram * (uint64_t) info.mem_unit;
+
+	mem_total     = (uint32_t) (si_total / MEGABYTE);
+	mem_used      = (uint32_t) ((si_total - si_free) / MEGABYTE);
+	mem_free_perc = (uint32_t) (si_free * 100 / si_total);
+
+	mem_total     = htonl(mem_total);
+	mem_used      = htonl(mem_used);
+	mem_free_perc = htonl(mem_free_perc);
+
+	struct rpc_db_set_path_value set_values[] = {
+		{
+			.path  = "system.stats.memory_used",
+			.value = {
+				.code = AVP_UINT32,
+				.vendor_id = VP_TRAVELPING,
+				.data = &mem_used,
+				.size = sizeof(mem_used)
+			}
+		},
+		{
+			.path  = "system.stats.memory_free_percentage",
+			.value = {
+				.code = AVP_UINT32,
+				.vendor_id = VP_TRAVELPING,
+				.data = &mem_free_perc,
+				.size = sizeof(mem_free_perc)
+			}
+		},
+		{
+			.path  = "system.stats.memory_total",
+			.value = {
+				.code = AVP_UINT32,
+				.vendor_id = VP_TRAVELPING,
+				.data = &mem_total,
+				.size = sizeof(mem_total)
+			}
+		}
+	};
+
+	int nvalues = sizeof(set_values) / sizeof(set_values[0]);
+	if (!report_total)
+		nvalues -= 1;
+
+	if ((rc = rpc_db_set(dmCtx, nvalues, set_values, NULL)) != RC_OK)
+		logx(LOG_WARNING, "Failed to report system information, rc=%d.", rc);
+
+	return RC_OK;
+}
+
+/**
+ * Periodically reports system information.
+ */
+static void
+report_system_monitoring_timer_cb(EV_P_ ev_timer *w, int revents)
+{
+	DMCONTEXT *dmCtx = (DMCONTEXT *) w->data;
+
+	if (report_system_monitoring_info(dmCtx, false) != RC_OK)
+		logx(LOG_WARNING, "Failed to report system information.");
+}
+
+/**
+ * Sets system information initially and starts ev_timer for periodic querying.
+ * 
+ * @param dmCtx The libdmconfig context.
+ * @return According dmconfig RC.
+ */
+static uint32_t
+init_system_monitoring(DMCONTEXT *dmCtx)
+{
+	if (report_system_monitoring_info(dmCtx, true) != RC_OK) {
+		logx(LOG_WARNING, "Failed to report system information.");
+		return RC_ERR_MISC;
+	}
+
+	ev_timer_init(&monitoring_timer, report_system_monitoring_timer_cb,
+		      5, 5);
+	monitoring_timer.data = dmCtx;
+	ev_timer_start(dmCtx->ev, &monitoring_timer);
+
+	return RC_OK;
+}
+
 static uint32_t
 socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribute__ ((unused)))
 {
@@ -1363,6 +1479,9 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 
 	if (init_timezone(dmCtx) != RC_OK)
 		logx(LOG_WARNING, "Initial update of Timezone failed.");
+
+	if (init_system_monitoring(dmCtx) != RC_OK)
+		logx(LOG_WARNING, "Initial update of system monitoring failed.");
 
 	/*
 	 * This requires the optional metropolis-ptp Yang module.
