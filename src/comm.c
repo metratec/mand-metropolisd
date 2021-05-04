@@ -76,6 +76,7 @@
 })
 
 #define MEGABYTE (1024U * 1024U)
+#define SYSTEM_MONITORING_REPORT_INTERVAL_S (10 * 60)
 
 static int sys_scan(const char *file, const char *fmt, ...)
 {
@@ -1350,7 +1351,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 {
 	struct sysinfo info;
 	uint64_t si_total, si_free;
-	uint32_t mem_used, mem_total, mem_free_perc, rc;
+	uint32_t mem_used, mem_total, mem_free_perc, loads[3], rc;
 
 	if (sysinfo(&info) != 0) {
 		logx(LOG_WARNING, "Failed to read sysinfo: %s.",
@@ -1369,6 +1370,9 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 	mem_used      = htonl(mem_used);
 	mem_free_perc = htonl(mem_free_perc);
 
+	for (int i = 0; i < 3; i++)
+		loads[i] = htonl((uint32_t) info.loads[i] * 100 / (1 << SI_LOAD_SHIFT));
+
 	struct rpc_db_set_path_value set_values[] = {
 		{
 			.path  = "system.stats.memory_used",
@@ -1386,6 +1390,33 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 				.vendor_id = VP_TRAVELPING,
 				.data = &mem_free_perc,
 				.size = sizeof(mem_free_perc)
+			}
+		},
+		{
+			.path  = "system.stats.load_average_1",
+			.value = {
+				.code = AVP_UINT32,
+				.vendor_id = VP_TRAVELPING,
+				.data = &loads[0],
+				.size = sizeof(loads[0])
+			}
+		},
+		{
+			.path  = "system.stats.load_average_5",
+			.value = {
+				.code = AVP_UINT32,
+				.vendor_id = VP_TRAVELPING,
+				.data = &loads[1],
+				.size = sizeof(loads[1])
+			}
+		},
+		{
+			.path  = "system.stats.load_average_15",
+			.value = {
+				.code = AVP_UINT32,
+				.vendor_id = VP_TRAVELPING,
+				.data = &loads[2],
+				.size = sizeof(loads[2])
 			}
 		},
 		{
@@ -1436,7 +1467,7 @@ init_system_monitoring(DMCONTEXT *dmCtx)
 	}
 
 	ev_timer_init(&monitoring_timer, report_system_monitoring_timer_cb,
-		      5, 5);
+		      	  5, SYSTEM_MONITORING_REPORT_INTERVAL_S);
 	monitoring_timer.data = dmCtx;
 	ev_timer_start(dmCtx->ev, &monitoring_timer);
 
