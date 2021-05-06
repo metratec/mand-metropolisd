@@ -1375,7 +1375,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 
 	struct rpc_db_set_path_value set_values[] = {
 		{
-			.path  = "system.stats.memory_used",
+			.path  = "metropolis.memory.memory-used",
 			.value = {
 				.code = AVP_UINT32,
 				.vendor_id = VP_TRAVELPING,
@@ -1384,7 +1384,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 			}
 		},
 		{
-			.path  = "system.stats.memory_free_percentage",
+			.path  = "metropolis.memory.memory-free-percentage",
 			.value = {
 				.code = AVP_UINT32,
 				.vendor_id = VP_TRAVELPING,
@@ -1393,7 +1393,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 			}
 		},
 		{
-			.path  = "system.stats.load_average_1",
+			.path  = "metropolis.cpu.load-average-1",
 			.value = {
 				.code = AVP_UINT32,
 				.vendor_id = VP_TRAVELPING,
@@ -1402,7 +1402,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 			}
 		},
 		{
-			.path  = "system.stats.load_average_5",
+			.path  = "metropolis.cpu.load-average-5",
 			.value = {
 				.code = AVP_UINT32,
 				.vendor_id = VP_TRAVELPING,
@@ -1411,7 +1411,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 			}
 		},
 		{
-			.path  = "system.stats.load_average_15",
+			.path  = "metropolis.cpu.load-average-15",
 			.value = {
 				.code = AVP_UINT32,
 				.vendor_id = VP_TRAVELPING,
@@ -1420,7 +1420,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 			}
 		},
 		{
-			.path  = "system.stats.memory_total",
+			.path  = "metropolis.memory.memory-total",
 			.value = {
 				.code = AVP_UINT32,
 				.vendor_id = VP_TRAVELPING,
