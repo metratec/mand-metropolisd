@@ -553,7 +553,11 @@ void set_wwan(const char *apn, const char *pin, const char *mode, const char *lt
 	        "TIMEOUT 5\n"
 	        "'' AT\n"
 	        "OK ATE1\n"
-	        "OK AT+CGDCONT=1,\"IPV4V6\",\"%s\"\n"
+	        /*
+	         * FIXME: What if the provider supports only IPV6?
+	         * Perhaps we should support a wwan.ip-mode setting.
+	         */
+	        "OK AT+CGDCONT=1,\"IP\",\"%s\"\n"
 	        "OK AT+CNMP=%u\n"
 	        "OK AT+CMNB=%u\n",
 	        PACKAGE_STRING, apn, mode_id, lte_mode_id);
