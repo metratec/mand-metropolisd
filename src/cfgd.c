@@ -441,6 +441,12 @@ void set_mosquitto(const char *host, uint16_t port,
 		return;
 	}
 
+	if (!username || !*username || strpbrk(username, " \t\n\r")) {
+		logx(LOG_WARNING, "Invalid username, will not start Mosquitto");
+		vsystem("systemctl stop mosquitto");
+		return;
+	}
+
 	FILE *fout = fopen("/var/run/mosquitto.conf", "w");
 	if (!fout) {
 		logx(LOG_ERR, "Cannot open mosquitto.conf for writing: %s",
@@ -474,20 +480,26 @@ void set_mosquitto(const char *host, uint16_t port,
 	        "topic spBv1.0/+/DDATA/# out 1\n"
 	        "topic spBv1.0/+/NDEATH/# out 1\n"
 	        "topic spBv1.0/+/DDEATH/# out 1\n"
-	        "topic spBv1.0/+/NCMD/# in 2\n"
-	        "topic spBv1.0/+/DCMD/# in 2\n"
+	        /*
+	         * NOTE: Due to a bug in the metraTec cloud's MQTT broker, we cannot
+	         * subscribe for everything containing the eon_node_id,
+	         * We therefore include it in the topic name.
+	         * This is safe since it is validated and must not contain any spaces.
+	         */
+	        "topic spBv1.0/+/NCMD/%s/# in 2\n"
+	        "topic spBv1.0/+/DCMD/%s/# in 2\n"
 	        /*
 	         * We assume that we can only receive STATE messages from the backend server
 	         * we're bridging to.
 	         */
-	        "topic STATE/# in 1\n",
-	        PACKAGE_STRING, host, port);
+	        "topic STATE/# in 1\n"
+	        "remote_clientid %s\n"
+	        "remote_username %s\n",
+	        PACKAGE_STRING, host, port,
+	        username, username, username, username);
 
-	if (username && *username && password && *password)
-		fprintf(fout, "remote_clientid %s\n"
-		              "remote_username %s\n"
-		              "remote_password %s\n",
-		        username, username, password);
+	if (password && *password && !strpbrk(password, "\n\r"))
+		fprintf(fout, "remote_password %s\n", password);
 
 	fclose(fout);
 
