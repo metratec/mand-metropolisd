@@ -814,7 +814,7 @@ wwanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 
 	/*
 	 * NOTE: We don't get here unless the previous GET was successful,
-	 * so we know we've got the necessary metropolis-sparkplug Yang module.
+	 * so we know we've got the necessary metropolis-wwan Yang module.
 	 */
 	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
 	    || answer_rc != RC_OK)
@@ -875,6 +875,57 @@ listWWAN(DMCONTEXT *dmCtx)
 }
 
 static void
+wlanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+             void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get WLAN parameters, ev=%d.\n", event);
+
+	/*
+	 * NOTE: We don't get here unless the previous GET was successful,
+	 * so we know we've got the necessary metropolis-wlan Yang module.
+	 */
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK)
+		CB_ERR("Couldn't get WLAN parameters, rc=%d,%d.\n",
+		       rc, answer_rc);
+
+	uint8_t enabled;
+	char *ssid, *password, *security;
+
+	if ((rc = dm_expect_uint8_type(grp, AVP_BOOL, VP_TRAVELPING, &enabled)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &ssid)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &password)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &security)) != RC_OK)
+		CB_ERR("Couldn't decode GET request, rc=%d", rc);
+
+	if (enabled)
+		set_wlan(ssid, password, security);
+	else if (system("systemctl stop metropolis-wlan") < 0)
+		logx(LOG_ERR, "Cannot disable WLAN connection");
+}
+
+static void
+listWLAN(DMCONTEXT *dmCtx)
+{
+	static const char *paths[] = {
+		"wlan.enabled",
+		"wlan.ssid",
+		"wlan.password",
+		"wlan.security"
+	};
+
+	uint32_t rc;
+
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
+	                      wlanReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't get WLAN parameters, rc=%d", rc);
+}
+
+static void
 request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 {
 	DMC_REQUEST req;
@@ -906,6 +957,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	uint32_t rc;
 	bool sparkplug_changed = false;
 	bool wwan_changed = false;
+	bool wlan_changed = false;
 
 	do {
 		DM2_AVPGRP grp;
@@ -952,6 +1004,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 
 		sparkplug_changed |= strncmp(path, "sparkplug.", 10) == 0;
 		wwan_changed |= strncmp(path, "wwan.", 5) == 0;
+		wlan_changed |= strncmp(path, "wlan.", 5) == 0;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
 
 	/*
@@ -962,6 +1015,8 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		listSparkplug(ctx);
 	if (wwan_changed)
 		listWWAN(ctx);
+	if (wlan_changed)
+		listWLAN(ctx);
 
 	return dm_expect_end(obj);
 }
@@ -1544,6 +1599,12 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	logx(LOG_INFO, "Registered recursive notification for \"wwan\", rc=%d.", rc);
 
 	/*
+	 * Requires the optional metropolis-wlan Yang module.
+	 */
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "wlan", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"wlan\", rc=%d.", rc);
+
+	/*
 	 * NOTE: Beginning with the first asynchronous method call, we must no longer
 	 * call synchronous versions.
 	 */
@@ -1555,6 +1616,7 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	listAutoId(dmCtx);
 	listSparkplug(dmCtx);
 	listWWAN(dmCtx);
+	listWLAN(dmCtx);
 
 	return RC_OK;
 }

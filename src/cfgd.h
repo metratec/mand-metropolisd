@@ -101,6 +101,8 @@ void set_mosquitto(const char *host, uint16_t port,
 void set_wwan(const char *apn, const char *pin,
               const char *mode, const char *lte_mode,
               const uint8_t *lte_bands);
+void set_wlan(const char *ssid, const char *password,
+              const char *security);
 void set_dns(const struct string_list *search, const struct string_list *servers);
 void set_authentication(const struct auth_list *auth);
 void set_if_addr(struct interface_list *info);
