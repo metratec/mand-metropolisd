@@ -31,6 +31,7 @@
 #include <syslog.h>
 #include <pwd.h>
 #include <getopt.h>
+#include <assert.h>
 
 #define USE_DEBUG
 
@@ -87,6 +88,28 @@ static int vasystem(const char *fmt, ...)
 	va_end(args);
 
 	return vsystem(buf);
+}
+
+/**
+ * Escape a string such that it can be passed as a command line argument
+ * in POSIX shell (double quotes).
+ *
+ * @param arg String to escape.
+ * @returns Escaped string. Must be freed with free().
+ */
+static char *quote_shell_arg(const char *arg)
+{
+	char *ret = malloc(strlen(arg)*2 + 1);
+	if (!ret)
+		return NULL;
+	char *p = ret;
+	while (*arg != '\0') {
+		if (strchr("\"\\$`", *arg))
+			*p++ = '\\';
+		*p++ = *arg++;
+	}
+	*p = '\0';
+	return ret;
 }
 
 void set_ntp_server(const struct ntp_servers *servers)
@@ -606,11 +629,15 @@ void set_value(char *path, const char *str)
 
 	if (strcmp(path, "system.hostname") == 0) {
 		/*
-		 * FIXME FIXME FIXME: This is vulnerable to Shell injections.
-		 * FIXME FIXME: hostnamectl currently broken on Metropolis
+		 * FIXME: It may be more elegant to use a function based on exec()
+		 * so we don't need quoting.
+		 * FIXME: hostnamectl missing on Metropolis.
 		 */
 #if 0
-		vasystem("hostnamectl set-hostname '%s'", str);
+		char *str_quoted = quote_shell_arg(str);
+		assert(str_quoted != NULL);
+		vasystem("hostnamectl set-hostname \"%s\"", str_quoted);
+		free(str_quoted);
 #endif
 	}
 }
