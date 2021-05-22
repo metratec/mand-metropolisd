@@ -893,16 +893,17 @@ wlanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 		       rc, answer_rc);
 
 	uint8_t enabled;
-	char *ssid, *password, *security;
+	char *ssid, *password, *security, *country;
 
 	if ((rc = dm_expect_uint8_type(grp, AVP_BOOL, VP_TRAVELPING, &enabled)) != RC_OK ||
 	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &ssid)) != RC_OK ||
 	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &password)) != RC_OK ||
-	    (rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &security)) != RC_OK)
+	    (rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &security)) != RC_OK ||
+	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &country)) != RC_OK)
 		CB_ERR("Couldn't decode GET request, rc=%d", rc);
 
 	if (enabled)
-		set_wlan(ssid, password, security);
+		set_wlan(ssid, password, security, country);
 	else if (system("systemctl stop metropolis-wlan") < 0)
 		logx(LOG_ERR, "Cannot disable WLAN connection");
 }
@@ -914,7 +915,8 @@ listWLAN(DMCONTEXT *dmCtx)
 		"wlan.enabled",
 		"wlan.ssid",
 		"wlan.password",
-		"wlan.security"
+		"wlan.security",
+		"wlan.country"
 	};
 
 	uint32_t rc;
