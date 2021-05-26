@@ -623,15 +623,15 @@ void set_wwan(const char *apn, const char *pin, const char *mode, const char *lt
 	vsystem("systemctl restart metropolis-wwan");
 }
 
-void set_wlan(const char *ssid, const char *password,
+void set_wifi(const char *ssid, const char *password,
               const char *security, const char *country)
 {
 	size_t password_len = strlen(password);
 
 	if (strcmp(security, "none") != 0 &&
 	    (8 > password_len || password_len > 63)) {
-		logx(LOG_WARNING, "Invalid WLAN passphrase");
-		vsystem("systemctl stop metropolis-wlan");
+		logx(LOG_WARNING, "Invalid Wi-Fi passphrase");
+		vsystem("systemctl stop metropolis-wifi");
 		return;
 	}
 
@@ -647,7 +647,7 @@ void set_wlan(const char *ssid, const char *password,
 	/*
 	 * NOTE: We don't currently limit the country codes that can be set.
 	 * This might result in invalid configurations, but the worst
-	 * that can happen is that metropolis-wlan is restarted indefinitely.
+	 * that can happen is that metropolis-wifi is restarted indefinitely.
 	 */
         if (country && strlen(country) == 2)
 		fprintf(fout, "country=%s\n", country);
@@ -683,7 +683,7 @@ void set_wlan(const char *ssid, const char *password,
 		free(ssid_quoted);
 	}
 
-	vsystem("systemctl restart metropolis-wlan");
+	vsystem("systemctl restart metropolis-wifi");
 }
 
 void set_value(char *path, const char *str)
