@@ -491,6 +491,63 @@ struct if_params {
 };
 
 static void
+dhcp_client_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
+               void *data, size_t size, void *cb_data)
+{
+	struct interface_list *info = (struct interface_list *)cb_data;
+	const char *s;
+
+	if (!(s = strchr(name + 1, '.')))
+		return;
+	if (!(s = strchr(s + 1, '.')))
+		return;
+
+	if (strncmp(s + 1, "interface", 9) == 0) {
+		char *interface = strndup(data, size);
+		unsigned int instance_id;
+
+		int rc = sscanf(interface, "interfaces.interface.%u", &instance_id);
+		free(interface);
+		if (rc != 1)
+			return;
+
+		for (int i = 0; i < info->count; i++) {
+			if (info->iface[i].instance_id == instance_id) {
+				info->iface[i].dhcp.enabled = true;
+				break;
+			}
+		}
+	}
+}
+
+static void
+dhcpClientListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *userdata)
+{
+	struct interface_list *info = userdata;
+	uint32_t rc, answer_rc;
+
+	if (event != DMCONFIG_ANSWER_READY) {
+		talloc_free(info);
+		CB_ERR("Couldn't list object, ev=%d.\n", event);
+	}
+
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK ||
+	    answer_rc != RC_OK) {
+		talloc_free(info);
+		CB_ERR("Couldn't list object, rc=%d,%d.\n", rc, answer_rc);
+	}
+
+	while (decode_node_list(socket, "", grp, dhcp_client_cb, info) == RC_OK);
+
+	if (info->flags & IF_NEIGH)
+		set_if_neigh(info);
+	if (info->flags & IF_IP)
+		set_if_addr(info);
+
+	talloc_free(info);
+}
+
+static void
 if_ip_addr(const char *name, void *data, size_t size, struct ip_list *list)
 {
 	const char *s;
@@ -588,8 +645,6 @@ if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
 	struct interface_list *info = (struct interface_list *)cb_data;
 	const char *s;
 
-	uint32_t rc;
-
 	if (!(s = strchr(name + 1, '.')))
 		return;
 	if (!(s = strchr(s + 1, '.')))
@@ -597,13 +652,6 @@ if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
 
 	if (strncmp(s + 1, "name", 4) == 0) {
 		struct interface *d;
-
-		char search_path[256];
-		struct dm2_avp search = {
-			.code = AVP_PATH,
-			.vendor_id = VP_TRAVELPING,
-			.data = search_path
-		};
 
 		if (!(d = add_var_list((struct var_list *)info, sizeof(struct interface))))
 			return;
@@ -617,16 +665,7 @@ if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
 
 		d->name = talloc_strndup(info->ctx, data, size);
 
-		/*
-		 * Since we support DHCP clients as specified by ietf-dhcp@2016-08-25.yang,
-		 * we need to determine whether an dhcp.client.interfaces.X node exists.
-		 * FIXME: Unfortunately, these queries are not atomic.
-		 * Also, we will have to use the blocking dmconfig API.
-		 */
-		search.size = snprintf(search_path, sizeof(search_path),
-		                       "interfaces%.*s", (int)(s - name), name);
-		rc = rpc_db_findinstance(socket, "dhcp.client.interfaces", "interface", &search, NULL);
-		d->dhcp.enabled = rc == RC_OK;
+		sscanf(name, ".interface.%u", &d->instance_id);
 	} else if (strncmp(s + 1, "ipv4", 4) == 0) {
 		if_ip(s + 6, data, size, &info->iface[info->count - 1].ipv4);
 	} else if (strncmp(s + 1, "ipv6", 4) == 0) {
@@ -637,9 +676,7 @@ if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
 static void
 ifListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *userdata)
 {
-	unsigned int flag = (unsigned int)(size_t)userdata;
 	uint32_t rc, answer_rc;
-	struct interface_list info;
 
 	if (event != DMCONFIG_ANSWER_READY)
 	        CB_ERR("Couldn't list object, ev=%d.\n", event);
@@ -648,15 +685,17 @@ ifListReceived(DMCONTEXT *socket, DMCONFIG_EVENT event, DM2_AVPGRP *grp, void *u
 	    || answer_rc != RC_OK)
 	        CB_ERR("Couldn't list object, rc=%d,%d.\n", rc, answer_rc);
 
-	new_var_list(grp->ctx, (struct var_list *)&info, sizeof(struct interface));
+	struct interface_list *info = talloc(socket, struct interface_list);
+	new_var_list(socket, (struct var_list *)info, sizeof(struct interface));
+	info->flags = (unsigned int)(size_t)userdata;
 
-	while (decode_node_list(socket, "", grp, if_cb, &info) == RC_OK) {
+	while (decode_node_list(socket, "", grp, if_cb, info) == RC_OK);
+
+	if (rpc_db_list_async(socket, 0, "dhcp.client.interfaces",
+	                      dhcpClientListReceived, info)) {
+		talloc_free(info);
+		CB_ERR("Couldn't register LIST request.\n");
 	}
-
-	if (flag | IF_NEIGH)
-		set_if_neigh(&info);
-	if (flag | IF_IP)
-		set_if_addr(&info);
 }
 
 static void
@@ -1491,7 +1530,7 @@ report_system_monitoring_info(DMCONTEXT *dmCtx, bool report_total)
 	if (!report_total)
 		nvalues -= 1;
 
-	if ((rc = rpc_db_set(dmCtx, nvalues, set_values, NULL)) != RC_OK)
+	if ((rc = rpc_db_set_async(dmCtx, nvalues, set_values, NULL, NULL)) != RC_OK)
 		logx(LOG_WARNING, "Failed to report system information, rc=%d.", rc);
 
 	return RC_OK;

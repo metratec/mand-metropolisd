@@ -82,6 +82,8 @@ struct if_dhcp {
 
 struct interface {
 	char *name;
+	unsigned int instance_id;
+
 	struct if_ip ipv4;
 	struct if_ip ipv6;
 	struct if_dhcp dhcp;
@@ -91,6 +93,8 @@ struct interface_list {
 	void *ctx;
 	int count;
 	struct interface *iface;
+
+	unsigned int flags;
 };
 
 void set_ntp_server(const struct ntp_servers *servers);
