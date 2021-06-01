@@ -1589,11 +1589,23 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 
 	logx(LOG_DEBUG, "Start session request registered.");
 
+	/*
+	 * FIXME: This would be important for reporting the interface state
+	 * via rpc_client_get_interface_state().
+	 * Unfortunately, the corresponding code in mand is fundamentally broken
+	 * (see update_interface_state() in dm_dmconfig.c).
+	 * It is trying to do synchronous dmconfig calls from what is almost always
+	 * a dmconfig watcher.
+	 * As a workaround, we might regularily poll and update `interfaces-state`
+	 * using dmconfig calls.
+	 */
+#if 0
 	if ((rc = rpc_register_role(dmCtx, "-state")) != RC_OK) {
 		ev_break(dmCtx->ev, EVBREAK_ALL);
 	        CB_ERR_RET(rc, "Couldn't register role, rc=%d.", rc);
 	}
 	logx(LOG_DEBUG, "Role registered.");
+#endif
 
 	if ((rc = rpc_subscribe_notify(dmCtx, NULL)) != RC_OK) {
 		ev_break(dmCtx->ev, EVBREAK_ALL);
