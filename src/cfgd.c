@@ -516,10 +516,24 @@ void set_mosquitto(const char *host, uint16_t port,
 	         * we're bridging to.
 	         */
 	        "topic STATE/# in 1\n"
+	        /*
+	         * This is set to publish notification messages to the local and
+		 * remote broker about the bridge connection.
+		 * Retained messages would be published to '$SYS/broker/connection/<remote_clientid>/state'.
+		 * This topic seems to be broken, so it is set with notification_topic.
+		 * Bridge protocol and try_private has to be set to inform the broker,
+		 * that a bridge is connecting.
+		 *
+		 * See https://github.com/vernemq/vernemq/issues/1306 for more informations.
+	         */
+	        "notifications true\n"
+	        "notification_topic CLIENTS/%s/state\n"
+	        "bridge_protocol_version mqttv311\n"
+	        "try_private false\n"
 	        "remote_clientid %s\n"
 	        "remote_username %s\n",
 	        PACKAGE_STRING, host, port,
-	        username, username, username, username);
+	        username, username, username, username, username);
 
 	if (password && *password && !strpbrk(password, "\n\r"))
 		fprintf(fout, "remote_password %s\n", password);
