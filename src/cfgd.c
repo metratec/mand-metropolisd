@@ -552,8 +552,8 @@ static inline bool validate_at_param(const char *str)
 	return str && !strpbrk(str, "\n\r\",");
 }
 
-void set_wwan(const char *apn, const char *pin, const char *mode, const char *lte_mode,
-              const uint8_t *lte_bands)
+void set_wwan_4g(const char *apn, const char *pin, const char *mode, const char *lte_mode,
+                 const uint8_t *lte_bands)
 {
 	/*
 	 * NOTE: It is apparently not possible to escape special characters in
@@ -604,7 +604,7 @@ void set_wwan(const char *apn, const char *pin, const char *mode, const char *lt
 	        "OK ATE1\n"
 	        /*
 	         * FIXME: What if the provider supports only IPV6?
-	         * Perhaps we should support a wwan.ip-mode setting.
+	         * Perhaps we should support a wwan-4g.ip-mode setting.
 	         */
 	        "OK AT+CGDCONT=1,\"IP\",\"%s\"\n"
 	        "OK AT+CNMP=%u\n"
@@ -634,7 +634,7 @@ void set_wwan(const char *apn, const char *pin, const char *mode, const char *lt
 
 	fclose(fout);
 
-	vsystem("systemctl restart metropolis-wwan");
+	vsystem("systemctl restart metropolis-wwan-4g");
 }
 
 void set_wifi(const char *ssid, const char *password,

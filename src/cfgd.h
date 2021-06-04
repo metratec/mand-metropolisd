@@ -102,9 +102,9 @@ void set_ptp_state(const char *state);
 void set_autoid_enabled(bool enabled);
 void set_mosquitto(const char *host, uint16_t port,
                    const char *username, const char *password);
-void set_wwan(const char *apn, const char *pin,
-              const char *mode, const char *lte_mode,
-              const uint8_t *lte_bands);
+void set_wwan_4g(const char *apn, const char *pin,
+                 const char *mode, const char *lte_mode,
+                 const uint8_t *lte_bands);
 void set_wifi(const char *ssid, const char *password,
               const char *security, const char *country);
 void set_dns(const struct string_list *search, const struct string_list *servers);

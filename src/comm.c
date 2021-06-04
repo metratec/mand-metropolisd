@@ -843,21 +843,21 @@ listSparkplug(DMCONTEXT *dmCtx)
 }
 
 static void
-wwanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
-             void *userdata __attribute__((unused)))
+wwan4Greceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+               void *userdata __attribute__((unused)))
 {
 	uint32_t rc, answer_rc;
 
 	if (event != DMCONFIG_ANSWER_READY)
-	        CB_ERR("Couldn't get WWAN parameters, ev=%d.\n", event);
+	        CB_ERR("Couldn't get GSM/LTE parameters, ev=%d.\n", event);
 
 	/*
 	 * NOTE: We don't get here unless the previous GET was successful,
-	 * so we know we've got the necessary metropolis-wwan Yang module.
+	 * so we know we've got the necessary metropolis-wwan-4g Yang module.
 	 */
 	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
 	    || answer_rc != RC_OK)
-		CB_ERR("Couldn't get WWAN parameters, rc=%d,%d.\n",
+		CB_ERR("Couldn't get GSM/LTE parameters, rc=%d,%d.\n",
 		       rc, answer_rc);
 
 	uint8_t enabled;
@@ -885,32 +885,32 @@ wwanReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 		lte_bands[i++] = band;
 	lte_bands[i] = 0;
 	if (i == sizeof(lte_bands)-1)
-	        logx(LOG_ERR, "Too many WWAN bands specified");
+	        logx(LOG_ERR, "Too many LTE bands specified");
 
 	if (enabled)
-		set_wwan(apn, pin, mode, lte_mode, lte_bands);
-	else if (system("systemctl stop metropolis-wwan") < 0)
-		logx(LOG_ERR, "Cannot disable WWAN connection");
+		set_wwan_4g(apn, pin, mode, lte_mode, lte_bands);
+	else if (system("systemctl stop metropolis-wwan-4g") < 0)
+		logx(LOG_ERR, "Cannot disable GSM/LTE connection");
 }
 
 static void
-listWWAN(DMCONTEXT *dmCtx)
+listWWAN4G(DMCONTEXT *dmCtx)
 {
 	static const char *paths[] = {
-		"wwan.enabled",
-		"wwan.apn",
-		"wwan.pin",
-		"wwan.mode",
-		"wwan.lte.mode",
-		"wwan.lte.band"
+		"wwan-4g.enabled",
+		"wwan-4g.apn",
+		"wwan-4g.pin",
+		"wwan-4g.mode",
+		"wwan-4g.lte.mode",
+		"wwan-4g.lte.band"
 	};
 
 	uint32_t rc;
 
 	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
-	                      wwanReceived, NULL);
+	                      wwan4Greceived, NULL);
 	if (rc != RC_OK)
-		CB_ERR("Couldn't get WWAN parameters, rc=%d", rc);
+		CB_ERR("Couldn't get GSM/LTE parameters, rc=%d", rc);
 }
 
 static void
@@ -997,7 +997,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 {
 	uint32_t rc;
 	bool sparkplug_changed = false;
-	bool wwan_changed = false;
+	bool wwan_4g_changed = false;
 	bool wifi_changed = false;
 
 	do {
@@ -1044,7 +1044,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		}
 
 		sparkplug_changed |= strncmp(path, "sparkplug.", 10) == 0;
-		wwan_changed |= strncmp(path, "wwan.", 5) == 0;
+		wwan_4g_changed |= strncmp(path, "wwan-4g.", 8) == 0;
 		wifi_changed |= strncmp(path, "wifi.", 5) == 0;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
 
@@ -1054,8 +1054,8 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	 */
 	if (sparkplug_changed)
 		listSparkplug(ctx);
-	if (wwan_changed)
-		listWWAN(ctx);
+	if (wwan_4g_changed)
+		listWWAN4G(ctx);
 	if (wifi_changed)
 		listWifi(ctx);
 
@@ -1646,10 +1646,10 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	logx(LOG_INFO, "Registered recursive notification for \"sparkplug\", rc=%d.", rc);
 
 	/*
-	 * Requires the optional metropolis-wwan Yang module.
+	 * Requires the optional metropolis-wwan-4g Yang module.
 	 */
-	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "wwan", NULL);
-	logx(LOG_INFO, "Registered recursive notification for \"wwan\", rc=%d.", rc);
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "wwan-4g", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"wwan-4g\", rc=%d.", rc);
 
 	/*
 	 * Requires the optional metropolis-wifi Yang module.
@@ -1668,7 +1668,7 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	listInterfaces(dmCtx, IF_IP | IF_NEIGH);
 	listAutoId(dmCtx);
 	listSparkplug(dmCtx);
-	listWWAN(dmCtx);
+	listWWAN4G(dmCtx);
 	listWifi(dmCtx);
 
 	return RC_OK;
