@@ -1570,47 +1570,69 @@ init_system_monitoring(DMCONTEXT *dmCtx)
 	return RC_OK;
 }
 
-static uint32_t
-socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribute__ ((unused)))
+void init_comm(struct ev_loop *loop)
 {
 	uint32_t rc;
+	DMCONTEXT *dmCtxState, *dmCtx;
 
-	if (event != DMCONFIG_CONNECTED) {
-		ev_break(dmCtx->ev, EVBREAK_ALL);
-	        CB_ERR_RET(RC_ERR_MISC, "Connecting socket unsuccessful.");
+	/*
+	 * Initialize dmconfig session for state reporting
+	 * (rpc_client_get_interface_state()).
+	 *
+	 * This uses a separate session to prevent possible
+	 * collisions in mand (if update_interface_state()
+	 * is called while data is transmitted on our
+	 * dmconfig session).
+	 */
+	if (!(dmCtxState = dm_context_new())) {
+	        logx(LOG_DEBUG, "Couldn't create socket context.");
+	        return;
 	}
 
+	dm_context_init(dmCtxState, loop, AF_INET, NULL, NULL, request_cb);
+
+	if ((rc = dm_connect(dmCtxState)) != RC_OK) {
+	        logx(LOG_DEBUG, "Couldn't register connect callback or connecting unsuccessful, rc=%d.", rc);
+		dm_context_shutdown(dmCtxState, DMCONFIG_ERROR_CONNECTING);
+		dm_context_release(dmCtxState);
+	        return;
+	}
 	logx(LOG_DEBUG, "Socket connected.");
 
-	if ((rc = rpc_startsession(dmCtx, CMD_FLAG_READWRITE, 0, NULL)) != RC_OK) {
-		ev_break(dmCtx->ev, EVBREAK_ALL);
-	        CB_ERR_RET(rc, "Couldn't register start session request, rc=%d.", rc);
-	}
+	if ((rc = rpc_startsession(dmCtxState, CMD_FLAG_READWRITE, 0, NULL)) != RC_OK)
+	        CB_ERR("Couldn't register start session request, rc=%d.", rc);
 
 	logx(LOG_DEBUG, "Start session request registered.");
 
-	/*
-	 * FIXME: This would be important for reporting the interface state
-	 * via rpc_client_get_interface_state().
-	 * Unfortunately, the corresponding code in mand is fundamentally broken
-	 * (see update_interface_state() in dm_dmconfig.c).
-	 * It is trying to do synchronous dmconfig calls from what is almost always
-	 * a dmconfig watcher.
-	 * As a workaround, we might regularily poll and update `interfaces-state`
-	 * using dmconfig calls.
-	 */
-#if 0
-	if ((rc = rpc_register_role(dmCtx, "-state")) != RC_OK) {
-		ev_break(dmCtx->ev, EVBREAK_ALL);
-	        CB_ERR_RET(rc, "Couldn't register role, rc=%d.", rc);
-	}
+	if ((rc = rpc_register_role(dmCtxState, "-state")) != RC_OK)
+	        CB_ERR("Couldn't register role, rc=%d.", rc);
 	logx(LOG_DEBUG, "Role registered.");
-#endif
 
-	if ((rc = rpc_subscribe_notify(dmCtx, NULL)) != RC_OK) {
-		ev_break(dmCtx->ev, EVBREAK_ALL);
-	        CB_ERR_RET(rc, "Couldn't register SUBSCRIBE NOTIFY request, rc=%d.", rc);
+	/*
+	 * Initialize main dmconfig session.
+	 */
+	if (!(dmCtx = dm_context_new())) {
+	        logx(LOG_DEBUG, "Couldn't create socket context.");
+	        return;
 	}
+
+	dm_context_init(dmCtx, loop, AF_INET, NULL, NULL, request_cb);
+
+	if ((rc = dm_connect(dmCtx)) != RC_OK) {
+	        logx(LOG_DEBUG, "Couldn't register connect callback or connecting unsuccessful, rc=%d.", rc);
+		dm_context_shutdown(dmCtx, DMCONFIG_ERROR_CONNECTING);
+		dm_context_release(dmCtx);
+	        return;
+	}
+	logx(LOG_DEBUG, "Socket connected.");
+
+	if ((rc = rpc_startsession(dmCtx, CMD_FLAG_READWRITE, 0, NULL)) != RC_OK)
+	        CB_ERR("Couldn't register start session request, rc=%d.", rc);
+
+	logx(LOG_DEBUG, "Start session request registered.");
+
+	if ((rc = rpc_subscribe_notify(dmCtx, NULL)) != RC_OK)
+	        CB_ERR("Couldn't register SUBSCRIBE NOTIFY request, rc=%d.", rc);
 	logx(LOG_DEBUG, "Notification subscription request registered.");
 
 	if (init_hostname(dmCtx) != RC_OK)
@@ -1670,28 +1692,4 @@ socketConnected(DMCONFIG_EVENT event, DMCONTEXT *dmCtx, void *userdata __attribu
 	listSparkplug(dmCtx);
 	listWWAN4G(dmCtx);
 	listWifi(dmCtx);
-
-	return RC_OK;
-}
-
-void init_comm(struct ev_loop *loop)
-{
-	uint32_t rc;
-	DMCONTEXT *ctx;
-
-	if (!(ctx = dm_context_new())) {
-	        logx(LOG_DEBUG, "Couldn't create socket context.");
-	        return;
-	}
-
-	dm_context_init(ctx, loop, AF_INET, NULL, socketConnected, request_cb);
-
-	/* connect */
-	if ((rc = dm_connect_async(ctx)) != RC_OK) {
-	        logx(LOG_DEBUG, "Couldn't register connect callback or connecting unsuccessful, rc=%d.", rc);
-		dm_context_shutdown(ctx, DMCONFIG_ERROR_CONNECTING);
-		dm_context_release(ctx);
-	        return;
-	}
-	logx(LOG_DEBUG, "Connect callback registered.");
 }
