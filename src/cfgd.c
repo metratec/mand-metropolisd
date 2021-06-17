@@ -356,41 +356,48 @@ void set_if_addr(struct interface_list *info)
 		        systemd_ip_setting(iface->ipv4.enabled && iface->ipv4.forwarding,
 		                           iface->ipv6.enabled && iface->ipv6.forwarding));
 
-		if (iface->ipv4.enabled && !iface->dhcp.enabled) {
-			for (int j = 0; j < iface->ipv4.addr.count; j++)
-				fprintf(fout, "Address=%s/%s\n",
-				        iface->ipv4.addr.ip[j].address, iface->ipv4.addr.ip[j].value);
-		}
-
-		if (iface->ipv6.enabled && !iface->dhcp.enabled) {
-			for (int j = 0; j < iface->ipv6.addr.count; j++)
-				fprintf(fout, "Address=%s/%s\n",
-				        iface->ipv6.addr.ip[j].address, iface->ipv6.addr.ip[j].value);
-		}
-
-#if 0
 		/*
-		 * A high route metric ensures a low priority of the default routes.
-		 * This ensures that any WWAN connection's rules will have a
-		 * higher priority, so traffic goes through the ethernet interface
-		 * only as a fallback.
+		 * NOTE: The route metric is necessary since we can have multiple
+		 * interfaces online and must make sure that the default route
+		 * only goes through the "best" interface.
+		 * The "priority" is currently derived from the database's instance ids
+		 * but could be made configurable as well.
 		 */
-		fputs("[DHCP]\n"
-		      "RouteMetric=4096\n", fout);
-#endif
-
-		if (!iface->dhcp.enabled && (iface->ipv4.enabled || iface->ipv6.enabled)) {
-			fputs("[Route]\n"
-			      /*"Metric=4096\n"*/, fout);
-
+		if (iface->dhcp.enabled) {
+			fprintf(fout, "[DHCP]\n"
+			              "RouteMetric=%u\n", i*256);
+		} else {
 			if (iface->ipv4.enabled) {
-				for (int j = 0; j < iface->ipv4.gateway.count; j++)
-					fprintf(fout, "Gateway=%s\n", iface->ipv4.gateway.ip[j].address);
+				for (int j = 0; j < iface->ipv4.addr.count; j++)
+					fprintf(fout, "[Address]\n"
+					              "Address=%s/%s\n"
+					              "RouteMetric=%u\n",
+					        iface->ipv4.addr.ip[j].address, iface->ipv4.addr.ip[j].value,
+					        i*256);
 			}
 
 			if (iface->ipv6.enabled) {
-				for (int j = 0; j < iface->ipv6.gateway.count; j++)
-					fprintf(fout, "Gateway=%s\n", iface->ipv6.gateway.ip[j].address);
+				for (int j = 0; j < iface->ipv6.addr.count; j++)
+					fprintf(fout, "[Address]\n"
+					              "Address=%s/%s\n"
+					              "RouteMetric=%u\n",
+					        iface->ipv6.addr.ip[j].address, iface->ipv6.addr.ip[j].value,
+					        i*256);
+			}
+
+			if (iface->ipv4.enabled || iface->ipv6.enabled) {
+				fprintf(fout, "[Route]\n"
+				              "Metric=%u\n", i*256);
+
+				if (iface->ipv4.enabled) {
+					for (int j = 0; j < iface->ipv4.gateway.count; j++)
+						fprintf(fout, "Gateway=%s\n", iface->ipv4.gateway.ip[j].address);
+				}
+
+				if (iface->ipv6.enabled) {
+					for (int j = 0; j < iface->ipv6.gateway.count; j++)
+						fprintf(fout, "Gateway=%s\n", iface->ipv6.gateway.ip[j].address);
+				}
 			}
 		}
 
