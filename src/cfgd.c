@@ -319,6 +319,15 @@ void set_if_addr(struct interface_list *info)
 		const char *dhcp_setting;
 		uint32_t mtu;
 
+		/*
+		 * NOTE: The route metric is necessary since we can have multiple
+		 * interfaces online and must make sure that the default route
+		 * only goes through the "best" interface.
+		 * The "priority" is currently derived from the database's instance ids
+		 * but could be made configurable as well.
+		 */
+		unsigned int metric = (i+1)*256;
+
 		snprintf(systemd_cfg, sizeof(systemd_cfg),
 		         "%s/network/%s.network",
 		         SYSTEMD_PREFIX, iface->name);
@@ -356,16 +365,9 @@ void set_if_addr(struct interface_list *info)
 		        systemd_ip_setting(iface->ipv4.enabled && iface->ipv4.forwarding,
 		                           iface->ipv6.enabled && iface->ipv6.forwarding));
 
-		/*
-		 * NOTE: The route metric is necessary since we can have multiple
-		 * interfaces online and must make sure that the default route
-		 * only goes through the "best" interface.
-		 * The "priority" is currently derived from the database's instance ids
-		 * but could be made configurable as well.
-		 */
 		if (iface->dhcp.enabled) {
 			fprintf(fout, "[DHCP]\n"
-			              "RouteMetric=%u\n", i*256);
+			              "RouteMetric=%u\n", metric);
 		} else {
 			if (iface->ipv4.enabled) {
 				for (int j = 0; j < iface->ipv4.addr.count; j++)
@@ -373,7 +375,7 @@ void set_if_addr(struct interface_list *info)
 					              "Address=%s/%s\n"
 					              "RouteMetric=%u\n",
 					        iface->ipv4.addr.ip[j].address, iface->ipv4.addr.ip[j].value,
-					        i*256);
+					        metric);
 			}
 
 			if (iface->ipv6.enabled) {
@@ -382,12 +384,12 @@ void set_if_addr(struct interface_list *info)
 					              "Address=%s/%s\n"
 					              "RouteMetric=%u\n",
 					        iface->ipv6.addr.ip[j].address, iface->ipv6.addr.ip[j].value,
-					        i*256);
+					        metric);
 			}
 
 			if (iface->ipv4.enabled || iface->ipv6.enabled) {
 				fprintf(fout, "[Route]\n"
-				              "Metric=%u\n", i*256);
+				              "Metric=%u\n", metric);
 
 				if (iface->ipv4.enabled) {
 					for (int j = 0; j < iface->ipv4.gateway.count; j++)
