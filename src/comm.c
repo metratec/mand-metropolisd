@@ -1351,31 +1351,47 @@ exit_nl:
 	return rc;
 }
 
-static uint32_t
-init_hostname(DMCONTEXT *dmCtx)
+static void
+hostnameReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+                 void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get hostname parameters, ev=%d.\n", event);
+
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK)
+		CB_ERR("Couldn't get hostname parameters, rc=%d,%d.\n",
+		       rc, answer_rc);
+
+	char *hostname;
+
+	if ((rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &hostname)) != RC_OK)
+		CB_ERR("Couldn't decode GET request, rc=%d", rc);
+
+	if (sethostname(hostname, strlen(hostname)))
+		CB_ERR("Couldn't decode GET request: %m");
+}
+
+static void
+listHostname(DMCONTEXT *dmCtx)
 {
 	uint32_t rc;
-	char hostname[256];
-	gethostname(hostname, sizeof(hostname));
 
-	struct rpc_db_set_path_value set_value = {
-		.path  = "system.hostname",
-		.value = {
-			.code = AVP_STRING,
-			.vendor_id = VP_TRAVELPING,
-			.data = hostname,
-			.size = strlen(hostname)
-		},
+	static const char *paths[] = {
+		"system.hostname"
 	};
-	if ((rc = rpc_db_set(dmCtx, 1, &set_value, NULL)) != RC_OK)
-		logx(LOG_WARNING, "Failed to report hostname, rc=%d.", rc);
 
-	if ((rc = rpc_param_notify(dmCtx, NOTIFY_ACTIVE, 1, &set_value.path, NULL)) != RC_OK) {
-		ev_break(dmCtx->ev, EVBREAK_ALL);
-		CB_ERR_RET(rc, "Couldn't register PARAM NOTIFY request, rc=%d.", rc);
-	}
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
+	                      hostnameReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Failed to get configured hostname, rc=%d.", rc);
 
-	return RC_OK;
+	rc = rpc_param_notify(dmCtx, NOTIFY_ACTIVE,
+	                      sizeof(paths)/sizeof(paths[0]), paths, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Failed to register notification for \"system.hostname\", rc=%d.", rc);
 }
 
 static uint32_t
@@ -1635,9 +1651,6 @@ void init_comm(struct ev_loop *loop)
 	        CB_ERR("Couldn't register SUBSCRIBE NOTIFY request, rc=%d.", rc);
 	logx(LOG_DEBUG, "Notification subscription request registered.");
 
-	if (init_hostname(dmCtx) != RC_OK)
-		logx(LOG_WARNING, "Initial update of Hostname failed.");
-
 	if (init_timezone(dmCtx) != RC_OK)
 		logx(LOG_WARNING, "Initial update of Timezone failed.");
 
@@ -1683,6 +1696,7 @@ void init_comm(struct ev_loop *loop)
 	 * NOTE: Beginning with the first asynchronous method call, we must no longer
 	 * call synchronous versions.
 	 */
+	listHostname(dmCtx);
 	listSystemNtp(dmCtx);
 	listSystemPtp(dmCtx);
 	listSystemDns(dmCtx);
