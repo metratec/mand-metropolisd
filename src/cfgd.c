@@ -711,17 +711,8 @@ void set_value(char *path, const char *str)
 	logx(LOG_DEBUG, "Parameter \"%s\" changed to \"%s\"", path, str);
 
 	if (strcmp(path, "system.hostname") == 0) {
-		/*
-		 * FIXME: It may be more elegant to use a function based on exec()
-		 * so we don't need quoting.
-		 * FIXME: hostnamectl missing on Metropolis.
-		 */
-#if 0
-		char *str_quoted = quote_shell_arg(str);
-		assert(str_quoted != NULL);
-		vasystem("hostnamectl set-hostname \"%s\"", str_quoted);
-		free(str_quoted);
-#endif
+		if (sethostname(str, strlen(str)))
+			logx(LOG_ERR, "Cannot set hostname: %m");
 	}
 }
 
