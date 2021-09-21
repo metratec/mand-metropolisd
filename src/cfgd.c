@@ -469,13 +469,13 @@ void set_mosquitto(const char *host, uint16_t port,
 {
 	if (!host || !*host) {
 		logx(LOG_WARNING, "Missing hostname, will not start Mosquitto");
-		vsystem("systemctl stop mosquitto");
+		vsystem("systemctl stop mosquitto-metropolis");
 		return;
 	}
 
 	if (!username || !*username || strpbrk(username, " \t\n\r")) {
 		logx(LOG_WARNING, "Invalid username, will not start Mosquitto");
-		vsystem("systemctl stop mosquitto");
+		vsystem("systemctl stop mosquitto-metropolis");
 		return;
 	}
 
@@ -553,7 +553,7 @@ void set_mosquitto(const char *host, uint16_t port,
 	 * Apparently, reloading Mosquitto is insufficient to re-establish
 	 * the bridge connection.
 	 */
-	vsystem("systemctl restart mosquitto");
+	vsystem("systemctl restart mosquitto-metropolis");
 }
 
 static inline bool validate_at_param(const char *str)
