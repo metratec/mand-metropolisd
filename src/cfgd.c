@@ -97,7 +97,7 @@ static int vasystem(const char *fmt, ...)
  * @param arg String to escape.
  * @returns Escaped string. Must be freed with free().
  */
-static char *quote_shell_arg(const char *arg)
+char *quote_shell_arg(const char *arg)
 {
 	char *ret = malloc(strlen(arg)*2 + 1);
 	if (!ret)

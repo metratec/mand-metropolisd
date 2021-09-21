@@ -25,6 +25,8 @@
 #include <errno.h>
 #include <ctype.h>
 #include <limits.h>
+#include <assert.h>
+#include <pthread.h>
 
 #include <netlink/route/link.h>
 #include <netlink/route/addr.h>
@@ -77,6 +79,12 @@
 
 #define MEGABYTE (1024U * 1024U)
 #define SYSTEM_MONITORING_REPORT_INTERVAL_S (10 * 60)
+
+/**
+ * Port that metropolis-fwd listens on.
+ * @bug This might actually potentially differ between Metropolis images.
+ */
+#define METROPOLIS_FWD_PORT 40000
 
 static int sys_scan(const char *file, const char *fmt, ...)
 {
@@ -1586,6 +1594,82 @@ init_system_monitoring(DMCONTEXT *dmCtx)
 	return RC_OK;
 }
 
+static void *
+firmware_download_thread_cb(void *user_data)
+{
+	FILE *file = user_data;
+	char buffer[256];
+
+	while (fgets(buffer, sizeof(buffer), file))
+		logx(LOG_INFO, "mand_mqtt_thread_cb(): %s", buffer);
+	if (!feof(file))
+		logx(LOG_ERR, "Error reading from pipe");
+
+	int rc = pclose(file);
+	if (rc != 0)
+		logx(LOG_ERR, "Error closing pipe: rc=%d", rc);
+
+	/*
+	 * FIXME: Do we have to gracefully shut down mand-metropolisd?
+	 * Theoretically, metropolis-fwd should shut down the system via
+	 * `reboot` which should terminate mand-metropolisd, so we don't
+	 * have to do anything.
+	 */
+	return NULL;
+}
+
+uint32_t
+rpc_agent_firmware_download(void *ctx, char *url, uint8_t credentialstype, char *credential,
+                            char *install_target, uint32_t timeframe, uint8_t retry_count,
+                            uint32_t retry_interval, uint32_t retry_interval_increment,
+                            DM2_REQUEST *answer)
+{
+	logx(LOG_DEBUG, "Firmware Upgrade from %s", url);
+
+	bool gzip = strlen(url) >= 3 && !strcmp(url+strlen(url)-3, ".gz");
+
+	/*
+	 * NOTE: This disables the metj-flash signature verification, so
+	 * we do not have to store the image anywhere.
+	 * They can get quite large and do not always fit into ramfs.
+	 * Since Metropolis images have their own internal signature that's
+	 * verified during flashing, this should not worsen security.
+	 *
+	 * It would also be possible to integrate libcurl with libev and turn
+	 * metj-flash into a library.
+	 * Flashing should then probably be handled by a separate daemon.
+	 */
+	char *url_quoted = quote_shell_arg(url);
+	assert(url_quoted != NULL);
+	char cmdline[1024];
+	snprintf(cmdline, sizeof(cmdline),
+	         "(wget -O - \"%s\" | %s metj-flash -K -ed 127.0.0.1:%u) 2>&1",
+	         url_quoted, gzip ? "gunzip -c |" : "", METROPOLIS_FWD_PORT);
+	free(url_quoted);
+	logx(LOG_DEBUG, "Executing: %s", cmdline);
+	errno = 0;
+	FILE *file = popen(cmdline, "r");
+	if (!file) {
+		logx(LOG_ERR, "Cannot create pipe to download and flash \"%s\": %m", url);
+		return RC_ERR_MISC;
+	}
+
+	/*
+	 * This is only for reading and logging progress messages.
+	 * Should we have to give feedback, we should use a libev watcher instead
+	 * and use dmconfig to upgrade some state parameter.
+	 */
+	pthread_t thread;
+	errno = pthread_create(&thread, NULL, firmware_download_thread_cb, file);
+	if (errno) {
+		logx(LOG_ERR, "Cannot start firmware upgrade thread: %m");
+		pclose(file);
+		return RC_ERR_MISC;
+	}
+
+	return RC_OK;
+}
+
 void init_comm(struct ev_loop *loop)
 {
 	uint32_t rc;
@@ -1646,6 +1730,10 @@ void init_comm(struct ev_loop *loop)
 	        CB_ERR("Couldn't register start session request, rc=%d.", rc);
 
 	logx(LOG_DEBUG, "Start session request registered.");
+
+	if ((rc = rpc_register_role(dmCtx, "-firmware")) != RC_OK)
+	        CB_ERR("Couldn't register role, rc=%d.", rc);
+	logx(LOG_DEBUG, "Role registered.");
 
 	if ((rc = rpc_subscribe_notify(dmCtx, NULL)) != RC_OK)
 	        CB_ERR("Couldn't register SUBSCRIBE NOTIFY request, rc=%d.", rc);
