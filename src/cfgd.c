@@ -267,26 +267,29 @@ set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
 	free(auth_file);
 }
 
-#else
-
-static void
-set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
-{
-}
-
 #endif
 
 void set_authentication(const struct auth_list *auth)
 {
-	int i;
+	FILE *file = fopen("/run/lighttpd.user", "w");
+	if (!file) {
+		/* FIXME: Error handling */
+		return;
+	}
 
 	logx(LOG_DEBUG, "Users: %d", auth->count);
-	for (i = 0; i < auth->count; i++) {
+	for (int i = 0; i < auth->count; i++) {
+		if (!*auth->user[i].name || strpbrk(auth->user[i].name, ":\r\n") ||
+		    !*auth->user[i].password || strpbrk(auth->user[i].password, "\r\n"))
+			continue;
+
 		logx(LOG_INFO, "User: %s, pass: %s, ssh: %d",
 		     auth->user[i].name, auth->user[i].password, auth->user[i].ssh.count);
 
-		set_ssh_keys(auth->user[i].name, &auth->user[i].ssh);
+		fprintf(file, "%s:%s\n", auth->user[i].name, auth->user[i].password);
 	}
+
+	fclose(file);
 }
 
 static inline const char *
