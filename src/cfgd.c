@@ -56,6 +56,8 @@
  */
 #define SYSTEMD_PREFIX "/run/systemd"
 
+#define CA_CERTIFICATES_PATH "/usr/share/ca-certificates/mozilla"
+
 static const char _build[] = "build on " __DATE__ " " __TIME__ " with gcc " __VERSION__;
 
 static int vsystem(const char *cmd);
@@ -506,6 +508,7 @@ void set_mosquitto(const char *host, uint16_t port,
 		"allow_anonymous true\n"
 	        "connection ACS\n"
 	        "address %s:%u\n"
+	        "bridge_capath %s\n"
 	        /*
 	         * NOTE: The remote end subscribes for messages only on our group_id and
 	         * eon_node_id.
@@ -548,7 +551,7 @@ void set_mosquitto(const char *host, uint16_t port,
 	        "try_private false\n"
 	        "remote_clientid %s\n"
 	        "remote_username %s\n",
-	        PACKAGE_STRING, host, port,
+	        PACKAGE_STRING, host, port, CA_CERTIFICATES_PATH,
 	        username, username, username, username, username);
 
 	if (password && *password && !strpbrk(password, "\n\r"))
