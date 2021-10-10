@@ -818,6 +818,16 @@ sparkplugCurrentServerReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGR
 	    (rc = dm_expect_group_end(grp)) != RC_OK)
 		CB_ERR("Couldn't decode GET request, rc=%d", rc);
 
+	/*
+	 * NOTE: This is necessary since after adding a new sparkplug.server
+	 * and making it the sparkplug.current-server, we need to get informed about
+	 * host and port changes as well.
+	 * Alternatively, we might add a dm_action and use the broadcast mechanism.
+	 */
+	rc = rpc_recursive_param_notify_async(dmCtx, NOTIFY_ACTIVE, current_server, NULL, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't subscribe for current Sparkplug server, rc=%d", rc);
+
 	char path_host[256], path_port[256];
 	strcat(strcpy(path_host, current_server), ".host");
 	strcat(strcpy(path_port, current_server), ".port");
