@@ -406,6 +406,13 @@ listSystemDns(DMCONTEXT *dmCtx)
 
 /***************************************/
 
+/*
+ * NOTE: We currently don't have to configure lighttpd as an authentication
+ * proxy. The code might still be useful someday should we want to configure
+ * some other service.
+ */
+#if 0
+
 static void
 ssh_key(const char *name, void *data, size_t size, struct auth_ssh_key_list *list)
 {
@@ -487,6 +494,12 @@ listAuthentication(DMCONTEXT *dmCtx)
 	if (rpc_db_list_async(dmCtx, 0, "system.authentication.user", AuthListReceived, NULL))
 	        CB_ERR("Couldn't register LIST request.\n");
 }
+
+#else
+
+static void listAuthentication(DMCONTEXT *dmCtx) {}
+
+#endif
 
 /** apply the values from interfaces.interface to the systemd configuration
  *
