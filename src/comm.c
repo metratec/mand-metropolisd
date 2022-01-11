@@ -793,15 +793,17 @@ sparkplugReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 	 * This could change in the future.
 	 */
 	uint32_t port;
+	uint8_t tls;
 
 	if ((rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &host)) != RC_OK ||
 	    (rc = dm_expect_uint32_type(grp, AVP_UINT32, VP_TRAVELPING, &port)) != RC_OK ||
+	    (rc = dm_expect_uint8_type(grp, AVP_BOOL, VP_TRAVELPING, &tls)) != RC_OK ||
 	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &username)) != RC_OK ||
 	    (rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &password)) != RC_OK ||
 	    (rc = dm_expect_group_end(grp)) != RC_OK)
 		CB_ERR("Couldn't decode GET request, rc=%d", rc);
 
-	set_mosquitto(host, port, username, password);
+	set_mosquitto(host, port, tls, username, password);
 }
 
 static void
@@ -841,13 +843,15 @@ sparkplugCurrentServerReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGR
 	if (rc != RC_OK)
 		CB_ERR("Couldn't subscribe for current Sparkplug server, rc=%d", rc);
 
-	char path_host[256], path_port[256];
+	char path_host[256], path_port[256], path_tls[256];
 	strcat(strcpy(path_host, current_server), ".host");
 	strcat(strcpy(path_port, current_server), ".port");
+	strcat(strcpy(path_tls, current_server), ".tls");
 
 	const char *paths[] = {
 		path_host, /* sparkplug.server.X.host */
 		path_port, /* sparkplug.server.X.port */
+		path_tls, /* sparkplug.server.X.tls */
 		"sparkplug.username",
 		"sparkplug.password"
 	};

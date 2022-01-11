@@ -100,7 +100,7 @@ struct interface_list {
 void set_ntp_server(const struct ntp_servers *servers);
 void set_ptp_state(const char *state);
 void set_autoid_enabled(bool enabled);
-void set_mosquitto(const char *host, uint16_t port,
+void set_mosquitto(const char *host, uint16_t port, bool tls,
                    const char *username, const char *password);
 void set_wwan_4g(const char *apn, const char *pin,
                  const char *mode, const char *lte_mode,

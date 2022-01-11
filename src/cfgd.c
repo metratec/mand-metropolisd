@@ -469,7 +469,7 @@ void set_autoid_enabled(bool enabled)
 	}
 }
 
-void set_mosquitto(const char *host, uint16_t port,
+void set_mosquitto(const char *host, uint16_t port, bool tls,
                    const char *username, const char *password)
 {
 	if (!host || !*host) {
@@ -508,7 +508,6 @@ void set_mosquitto(const char *host, uint16_t port,
 		"allow_anonymous true\n"
 	        "connection ACS\n"
 	        "address %s:%u\n"
-	        "bridge_capath %s\n"
 	        /*
 	         * NOTE: The remote end subscribes for messages only on our group_id and
 	         * eon_node_id.
@@ -551,11 +550,12 @@ void set_mosquitto(const char *host, uint16_t port,
 	        "try_private false\n"
 	        "remote_clientid %s\n"
 	        "remote_username %s\n",
-	        PACKAGE_STRING, host, port, CA_CERTIFICATES_PATH,
+	        PACKAGE_STRING, host, port,
 	        username, username, username, username, username);
-
 	if (password && *password && !strpbrk(password, "\n\r"))
 		fprintf(fout, "remote_password %s\n", password);
+	if (tls)
+		fprintf(fout, "bridge_capath %s\n", CA_CERTIFICATES_PATH);
 
 	fclose(fout);
 
