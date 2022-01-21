@@ -377,19 +377,15 @@ void set_if_addr(struct interface_list *info)
 			if (iface->ipv4.enabled) {
 				for (int j = 0; j < iface->ipv4.addr.count; j++)
 					fprintf(fout, "[Address]\n"
-					              "Address=%s/%s\n"
-					              "RouteMetric=%u\n",
-					        iface->ipv4.addr.ip[j].address, iface->ipv4.addr.ip[j].value,
-					        metric);
+					              "Address=%s/%s\n",
+					        iface->ipv4.addr.ip[j].address, iface->ipv4.addr.ip[j].value);
 			}
 
 			if (iface->ipv6.enabled) {
 				for (int j = 0; j < iface->ipv6.addr.count; j++)
 					fprintf(fout, "[Address]\n"
-					              "Address=%s/%s\n"
-					              "RouteMetric=%u\n",
-					        iface->ipv6.addr.ip[j].address, iface->ipv6.addr.ip[j].value,
-					        metric);
+					              "Address=%s/%s\n",
+					        iface->ipv6.addr.ip[j].address, iface->ipv6.addr.ip[j].value);
 			}
 
 			if (iface->ipv4.enabled || iface->ipv6.enabled) {
