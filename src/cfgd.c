@@ -587,6 +587,15 @@ void set_wwan_4g(const char *apn, const char *pin, const char *mode, const char 
 		return;
 	}
 
+	unsigned int mode_id = 0;
+
+	if (!strcmp(mode, "automatic"))
+		mode_id = 0;
+	else if (!strcmp(mode, "gsm"))
+		mode_id = 1;
+	else if (!strcmp(mode, "lte"))
+		mode_id = 3;
+
 #if 0
 	unsigned int lte_mode_id = 3;
 
@@ -617,22 +626,9 @@ void set_wwan_4g(const char *apn, const char *pin, const char *mode, const char 
 	         * FIXME: What if the provider supports only IPV6?
 	         * Perhaps we should support a wwan-4g.ip-mode setting.
 	         */
-	        "OK AT+CGDCONT=1,\"IP\",\"%s\",,0,0\n",
-	        PACKAGE_STRING, apn);
-	if (!strcmp(mode, "automatic")) {
-		fputs("OK AT+COPS=0\n", fout);
-	} else {
-		unsigned int mode_id = 0;
-
-		/*
-		 * FIXME: Should we support UMTS (2)?
-		 */
-		if (!strcmp(mode, "gsm"))
-			mode_id = 0;
-		else if (!strcmp(mode, "lte"))
-			mode_id = 8;
-		fprintf(fout, "OK AT+COPS=0,0,,%u\n", mode_id);
-	}
+	        "OK AT+CGDCONT=1,\"IP\",\"%s\",,0,0\n"
+	        "OK AT+QCFG=\"nwscanmode\",%u\n",
+	        PACKAGE_STRING, apn, mode_id);
 	if (pin && *pin)
 		fprintf(fout, "OK AT+CPIN=%s\n", pin);
 	if (lte_bands) {
