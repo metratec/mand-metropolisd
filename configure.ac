@@ -67,11 +67,6 @@ AC_CHECK_LIB([dm_dmclient], [rpc_startsession],,   AC_MSG_ERROR(Required library
 AC_CHECK_HEADER(pthread.h, , AC_MSG_ERROR(You need the pthread headers))
 AC_CHECK_LIB(pthread, pthread_create, , AC_MSG_ERROR(You need the pthread library))
 
-# Check for libnl3 >=3.2.8. If present enable remus network buffering.
-PKG_CHECK_MODULES([LIBNL3], [libnl-3.0 >= 3.2.8 libnl-route-3.0 >= 3.2.8])
-AC_SUBST([LIBNL3_LIBS])
-AC_SUBST([LIBNL3_CFLAGS])
-
 AC_ARG_ENABLE(debug-tweaks,
         AS_HELP_STRING([--enable-debug-tweaks],
                        [Enable insecure debug tweaks [default=no]]),

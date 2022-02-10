@@ -3,8 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 AM_CFLAGS = -g -D_GNU_SOURCE -Wall -Wno-strict-aliasing \
-            -I$(top_srcdir)/include/compat -I$(top_srcdir)/include -g -funit-at-a-time -std=gnu11 $(LIBNL3_CFLAGS)
-AM_LDFLAGS= $(LIBNL3_LIBS)
+            -I$(top_srcdir)/include/compat -I$(top_srcdir)/include -g -funit-at-a-time -std=gnu11
 
 bin_PROGRAMS = mand-metropolisd
 

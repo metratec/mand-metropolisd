@@ -26,7 +26,6 @@ sysfs and netlink API's are used.
 - gcc >= 4.7
 - libev
 - libtalloc
-- libnl and libnl-route
 
 ## Build and Install
 
