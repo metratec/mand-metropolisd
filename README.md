@@ -26,6 +26,7 @@ sysfs and netlink API's are used.
 - gcc >= 4.7
 - libev
 - libtalloc
+- libcrypto (OpenSSL)
 
 ## Build and Install
 

@@ -35,6 +35,8 @@
 
 #define USE_DEBUG
 
+#include <openssl/sha.h>
+
 #include <ev.h>
 
 #include <mand/logx.h>
@@ -273,25 +275,43 @@ set_ssh_keys(const char *name, const struct auth_ssh_key_list *list)
 
 void set_authentication(const struct auth_list *auth)
 {
-	FILE *file = fopen("/run/lighttpd.user", "w");
+	FILE *file = fopen("/run/pyot-engine-users.json", "w");
 	if (!file) {
 		/* FIXME: Error handling */
 		return;
 	}
 
+	fputs("{\"users\": [", file);
+
 	logx(LOG_DEBUG, "Users: %d", auth->count);
 	for (int i = 0; i < auth->count; i++) {
-		if (!*auth->user[i].name || strpbrk(auth->user[i].name, ":\r\n") ||
-		    !*auth->user[i].password || strpbrk(auth->user[i].password, "\r\n"))
+		if (!*auth->user[i].name || strpbrk(auth->user[i].name, "\\\"") ||
+		    !*auth->user[i].password)
 			continue;
 
 		logx(LOG_INFO, "User: %s, pass: %s, ssh: %d",
 		     auth->user[i].name, auth->user[i].password, auth->user[i].ssh.count);
 
-		fprintf(file, "%s:%s\n", auth->user[i].name, auth->user[i].password);
+		unsigned char hash[SHA256_DIGEST_LENGTH];
+		SHA256((unsigned char *)auth->user[i].password, strlen(auth->user[i].password), hash);
+
+		fprintf(file, "%s{\"username\": \"%s\", \"password\": \"",
+		        i == 0 ? "\n" : ",\n", auth->user[i].name);
+		for (int i = 0; i < sizeof(hash); i++)
+			fprintf(file, "%02x", hash[i]);
+		fprintf(file, "\", \"roles\": [\"%s\"]}",
+		        !strcmp(auth->user[i].name, "admin") ? "admin" : "user");
 	}
 
+	fputs("\n]}", file);
 	fclose(file);
+
+	/*
+	 * NOTE: Not every Metropolis-based device has pyot-engine
+	 * and the existance of the user-database does not correspond with the
+	 * existance of pyot-engine.
+	 */
+	//vsystem("systemctl try-reload-or-restart pyot-engine");
 }
 
 static inline const char *

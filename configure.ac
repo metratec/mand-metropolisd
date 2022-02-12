@@ -67,6 +67,11 @@ AC_CHECK_LIB([dm_dmclient], [rpc_startsession],,   AC_MSG_ERROR(Required library
 AC_CHECK_HEADER(pthread.h, , AC_MSG_ERROR(You need the pthread headers))
 AC_CHECK_LIB(pthread, pthread_create, , AC_MSG_ERROR(You need the pthread library))
 
+PKG_CHECK_MODULES(LIBCRYPTO, [libcrypto], [
+	CFLAGS="$CFLAGS $LIBCRYPTO_CFLAGS"
+	LIBS="$LIBS $LIBCRYPTO_LIBS"
+])
+
 AC_ARG_ENABLE(debug-tweaks,
         AS_HELP_STRING([--enable-debug-tweaks],
                        [Enable insecure debug tweaks [default=no]]),
