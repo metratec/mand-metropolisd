@@ -642,6 +642,8 @@ if_cb(DMCONTEXT *socket, const char *name, uint32_t code, uint32_t vendor_id,
 		d->name = talloc_strndup(info->ctx, data, size);
 
 		sscanf(name, ".interface.%u", &d->instance_id);
+	} else if (strncmp(s + 1, "route-metric", 12) == 0) {
+		info->iface[info->count - 1].metric = dm_get_uint32_avp(data);
 	} else if (strncmp(s + 1, "ipv4", 4) == 0) {
 		if_ip(s + 6, data, size, &info->iface[info->count - 1].ipv4);
 	} else if (strncmp(s + 1, "ipv6", 4) == 0) {

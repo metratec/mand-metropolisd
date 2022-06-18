@@ -83,6 +83,7 @@ struct if_dhcp {
 struct interface {
 	char *name;
 	unsigned int instance_id;
+	unsigned int metric;
 
 	struct if_ip ipv4;
 	struct if_ip ipv6;
