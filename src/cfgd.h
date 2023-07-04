@@ -111,6 +111,7 @@ void set_dns(const struct string_list *search, const struct string_list *servers
 void set_authentication(const struct auth_list *auth);
 void set_if_addr(struct interface_list *info);
 void set_if_neigh(struct interface_list *info);
+void set_hostname(const char *str);
 void set_value(char *path, const char *str);
 
 char *quote_shell_arg(const char *arg);

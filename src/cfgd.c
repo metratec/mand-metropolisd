@@ -694,13 +694,26 @@ void set_wifi(const char *ssid, const char *password,
 	vsystem("systemctl restart metropolis-wifi");
 }
 
+void set_hostname(const char *str)
+{
+	if (sethostname(str, strlen(str))) {
+		logx(LOG_ERR, "Cannot set hostname: %m");
+		return;
+	}
+
+	/*
+	 * NOTE: Reloading the avahi-daemon is not enough to pick up new
+	 * host names.
+	 */
+	vsystem("systemctl restart avahi-daemon");
+}
+
 void set_value(char *path, const char *str)
 {
 	logx(LOG_DEBUG, "Parameter \"%s\" changed to \"%s\"", path, str);
 
 	if (strcmp(path, "system.hostname") == 0) {
-		if (sethostname(str, strlen(str)))
-			logx(LOG_ERR, "Cannot set hostname: %m");
+		set_hostname(str);
 	}
 }
 

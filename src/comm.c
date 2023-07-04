@@ -1052,8 +1052,7 @@ hostnameReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 	if ((rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &hostname)) != RC_OK)
 		CB_ERR("Couldn't decode GET request, rc=%d", rc);
 
-	if (sethostname(hostname, strlen(hostname)))
-		CB_ERR("Couldn't decode GET request: %m");
+	set_hostname(hostname);
 }
 
 static void
