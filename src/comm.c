@@ -1363,7 +1363,7 @@ rpc_agent_firmware_download(void *ctx, char *url, uint8_t credentialstype, char 
 	assert(url_quoted != NULL);
 	char cmdline[1024];
 	snprintf(cmdline, sizeof(cmdline),
-	         "(wget -O - \"%s\" | %s metj-flash -K -ed 127.0.0.1:%u) 2>&1",
+	         "(curl -o - \"%s\" | %s metj-flash -K -ed 127.0.0.1:%u) 2>&1",
 	         url_quoted, gzip ? "gunzip -c |" : "", METROPOLIS_FWD_PORT);
 	free(url_quoted);
 	logx(LOG_DEBUG, "Executing: %s", cmdline);
