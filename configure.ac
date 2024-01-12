@@ -57,7 +57,7 @@ AM_MAINTAINER_MODE
 AC_MSG_PART(required libraries)
 AC_CHECK_LIB([ev], [event_init],,             AC_MSG_ERROR(Required library ev missing))
 AC_CHECK_HEADERS([talloc.h talloc/talloc.h])
-AC_CHECK_LIB([talloc], [talloc_named_const],, AC_MSG_ERROR(Required library talloc missing))
+AC_CHECK_LIB([talloc], [talloc_total_size],, AC_MSG_ERROR(Required library talloc missing))
 AC_CHECK_LIB([dmutils], [logx],,              AC_MSG_ERROR(Required library dmutils missing))
 AC_CHECK_HEADER([mand/logx.h])
 AC_CHECK_LIB([dmconfig], [dm_context_init],,   AC_MSG_ERROR(Required library dmconfig missing))
