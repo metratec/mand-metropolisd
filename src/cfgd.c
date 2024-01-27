@@ -713,6 +713,16 @@ void set_ex10(bool initial_setup, const char *mode)
 	vsystem("systemctl restart ex10-at");
 }
 
+/*
+ * Multiple Java apps can be implemented in the future.
+ * That's way we already get the `name` passed.
+ * Should we need multiple apps, this could be passed to a service template.
+ */
+void set_java(const char *name, bool enabled)
+{
+	vasystem("systemctl %s metropolis-java-app", enabled ? "start" : "stop");
+}
+
 void set_hostname(const char *str)
 {
 	if (sethostname(str, strlen(str))) {
