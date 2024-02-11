@@ -660,35 +660,39 @@ void set_wifi(const char *ssid, const char *password,
         if (country && strlen(country) == 2)
 		fprintf(fout, "country=%s\n", country);
 
-	fprintf(fout,
-	        "network={\n"
-	        "key_mgmt=%s\n"
-	        "scan_ssid=1\n"
-	        "ssid=",
-	        !strcmp(security, "wpa2-personal") ? "WPA-PSK" : "NONE");
-	for (const char *p = ssid; *p; p++)
-		fprintf(fout, "%02X", *p);
-	fputs("\n", fout);
+	if (strlen(ssid) > 1) {
+		fprintf(fout,
+		        "network={\n"
+		        "key_mgmt=%s\n"
+		        "scan_ssid=1\n"
+		        "ssid=",
+		        !strcmp(security, "wpa2-personal") ? "WPA-PSK" : "NONE");
+		for (const char *p = ssid; *p; p++)
+			fprintf(fout, "%02X", *p);
+		fputs("\n", fout);
 
-	if (!strcmp(security, "none")) {
-		fputs("}", fout);
-		fclose(fout);
+		if (!strcmp(security, "none")) {
+			fputs("}", fout);
+			fclose(fout);
+		} else {
+			fclose(fout);
+
+			char *ssid_quoted = quote_shell_arg(ssid);
+			char *password_quoted = quote_shell_arg(password);
+			assert(ssid_quoted != NULL && password_quoted != NULL);
+
+			/*
+			 * NOTE: SSIDs and passwords have a maximum length, so
+			 * vasystem() will definitely work here.
+			 */
+			vasystem("wpa_passphrase \"%s\" \"%s\" | tail -n -2 >>/run/wpa_supplicant.conf",
+			         ssid_quoted, password_quoted);
+
+			free(password_quoted);
+			free(ssid_quoted);
+		}
 	} else {
 		fclose(fout);
-
-		char *ssid_quoted = quote_shell_arg(ssid);
-		char *password_quoted = quote_shell_arg(password);
-		assert(ssid_quoted != NULL && password_quoted != NULL);
-
-		/*
-		 * NOTE: SSIDs and passwords have a maximum length, so
-		 * vasystem() will definitely work here.
-		 */
-		vasystem("wpa_passphrase \"%s\" \"%s\" | tail -n -2 >>/run/wpa_supplicant.conf",
-		         ssid_quoted, password_quoted);
-
-		free(password_quoted);
-		free(ssid_quoted);
 	}
 
 	vsystem("systemctl restart metropolis-wifi");
