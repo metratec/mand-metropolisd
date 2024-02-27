@@ -917,49 +917,6 @@ listWifi(DMCONTEXT *dmCtx)
 }
 
 static void
-ex10Received(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
-             void *userdata __attribute__((unused)))
-{
-	uint32_t rc, answer_rc;
-
-	if (event != DMCONFIG_ANSWER_READY)
-	        CB_ERR("Couldn't get Ex10 parameters, ev=%d.\n", event);
-
-	/*
-	 * NOTE: We don't get here unless the previous GET was successful,
-	 * so we know we've got the necessary metropolis-ex10 Yang module.
-	 */
-	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
-	    || answer_rc != RC_OK)
-		CB_ERR("Couldn't get Ex10 parameters, rc=%d,%d.\n",
-		       rc, answer_rc);
-
-	char *machine, *mode;
-
-	if ((rc = dm_expect_string_type(grp, AVP_STRING, VP_TRAVELPING, &machine)) != RC_OK ||
-	    (rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &mode)) != RC_OK)
-		CB_ERR("Couldn't decode GET request, rc=%d", rc);
-
-	set_ex10(!strcmp(machine, ""), mode);
-}
-
-static void
-listEx10(DMCONTEXT *dmCtx)
-{
-	static const char *paths[] = {
-		"system-state.platform.machine",
-		"ex10.mode"
-	};
-
-	uint32_t rc;
-
-	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
-	                      ex10Received, NULL);
-	if (rc != RC_OK)
-		CB_ERR("Couldn't get Ex10 parameters, rc=%d", rc);
-}
-
-static void
 javaReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
              void *userdata __attribute__((unused)))
 {
@@ -1039,7 +996,6 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	bool sparkplug_changed = false;
 	bool wwan_4g_changed = false;
 	bool wifi_changed = false;
-	bool ex10_changed = false;
 	bool java_changed = false;
 
 	do {
@@ -1086,7 +1042,6 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		sparkplug_changed |= strncmp(path, "sparkplug.", 10) == 0;
 		wwan_4g_changed |= strncmp(path, "wwan-4g.", 8) == 0;
 		wifi_changed |= strncmp(path, "wifi.", 5) == 0;
-		ex10_changed |= strncmp(path, "ex10.", 5) == 0;
 		java_changed |= strncmp(path, "java.", 5) == 0;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
 
@@ -1100,8 +1055,6 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		listWWAN4G(ctx);
 	if (wifi_changed)
 		listWifi(ctx);
-	if (ex10_changed)
-		listEx10(ctx);
 	if (java_changed)
 		listJava(ctx);
 
@@ -1521,13 +1474,6 @@ void init_comm(struct ev_loop *loop)
 	logx(LOG_INFO, "Registered recursive notification for \"wifi\", rc=%d.", rc);
 
 	/*
-	 * Requires the optional metropolis-ex10 Yang module.
-	 */
-	static const char *ex10_paths[] = {"ex10.mode"};
-	rc = rpc_param_notify(dmCtx, NOTIFY_ACTIVE, sizeof(ex10_paths)/sizeof(ex10_paths[0]), ex10_paths, NULL);
-	logx(LOG_INFO, "Registered recursive notification for \"ex10\", rc=%d.", rc);
-
-	/*
 	 * Requires the optional metropolis-java Yang module.
 	 */
 	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "java", NULL);
@@ -1546,6 +1492,5 @@ void init_comm(struct ev_loop *loop)
 	listSparkplug(dmCtx);
 	listWWAN4G(dmCtx);
 	listWifi(dmCtx);
-	listEx10(dmCtx);
 	listJava(dmCtx);
 }
