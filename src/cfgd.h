@@ -107,7 +107,6 @@ void set_wwan_4g(const char *apn, const char *pin,
                  const uint8_t *lte_bands);
 void set_wifi(const char *ssid, const char *password,
               const char *security, const char *country);
-void set_ex10(bool initial_setup, const char *mode);
 void set_java(const char *name, bool enabled);
 void set_dns(const struct string_list *search, const struct string_list *servers);
 void set_authentication(const struct auth_list *auth);
