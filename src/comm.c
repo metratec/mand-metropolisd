@@ -1350,7 +1350,12 @@ rpc_agent_firmware_download(void *ctx, char *url, uint8_t credentialstype, char 
 {
 	logx(LOG_DEBUG, "Firmware Upgrade from %s", url);
 
-	bool gzip = strlen(url) >= 3 && !strcmp(url+strlen(url)-3, ".gz");
+	const char *uncompress = "";
+
+	if (strlen(url) >= 3 && !strcmp(url+strlen(url)-3, ".gz"))
+		uncompress = "gunzip -c |";
+	else if (strlen(url) >= 4 && !strcmp(url+strlen(url)-4, ".zip"))
+		uncompress = "unzip -p - '*.metj' |";
 
 	/*
 	 * NOTE: This disables the metj-flash signature verification, so
@@ -1359,8 +1364,8 @@ rpc_agent_firmware_download(void *ctx, char *url, uint8_t credentialstype, char 
 	 * Since Metropolis images have their own internal signature that's
 	 * verified during flashing, this should not worsen security.
 	 *
-	 * It would also be possible to integrate libcurl with libev and turn
-	 * metj-flash into a library.
+	 * It would also be possible to integrate libcurl with libev and use
+	 * the metj-flash library.
 	 * Flashing should then probably be handled by a separate daemon.
 	 */
 	char *url_quoted = quote_shell_arg(url);
@@ -1368,7 +1373,7 @@ rpc_agent_firmware_download(void *ctx, char *url, uint8_t credentialstype, char 
 	char cmdline[1024];
 	snprintf(cmdline, sizeof(cmdline),
 	         "(curl -o - \"%s\" | %s metj-flash -K -ed 127.0.0.1:%u) 2>&1",
-	         url_quoted, gzip ? "gunzip -c |" : "", METROPOLIS_FWD_PORT);
+	         url_quoted, uncompress, METROPOLIS_FWD_PORT);
 	free(url_quoted);
 	logx(LOG_DEBUG, "Executing: %s", cmdline);
 	errno = 0;
