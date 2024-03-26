@@ -1355,7 +1355,7 @@ rpc_agent_firmware_download(void *ctx, char *url, uint8_t credentialstype, char 
 	if (strlen(url) >= 3 && !strcmp(url+strlen(url)-3, ".gz"))
 		uncompress = "gunzip -c |";
 	else if (strlen(url) >= 4 && !strcmp(url+strlen(url)-4, ".zip"))
-		uncompress = "unzip -p - '*.metj' |";
+		uncompress = "busybox unzip -p - -x '*.txt' |";
 
 	/*
 	 * NOTE: This disables the metj-flash signature verification, so
