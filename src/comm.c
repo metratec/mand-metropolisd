@@ -917,21 +917,21 @@ listWifi(DMCONTEXT *dmCtx)
 }
 
 static void
-javaReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
-             void *userdata __attribute__((unused)))
+appReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
+            void *userdata __attribute__((unused)))
 {
 	uint32_t rc, answer_rc;
 
 	if (event != DMCONFIG_ANSWER_READY)
-	        CB_ERR("Couldn't get Java parameters, ev=%d.\n", event);
+	        CB_ERR("Couldn't get app parameters, ev=%d.\n", event);
 
 	/*
 	 * NOTE: We don't get here unless the previous GET was successful,
-	 * so we know we've got the necessary metropolis-java Yang module.
+	 * so we know we've got the necessary metropolis-app Yang module.
 	 */
 	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
 	    || answer_rc != RC_OK)
-		CB_ERR("Couldn't get Java parameters, rc=%d,%d.\n",
+		CB_ERR("Couldn't get app parameters, rc=%d,%d.\n",
 		       rc, answer_rc);
 
 	char *name;
@@ -941,26 +941,26 @@ javaReceived(DMCONTEXT *dmCtx, DMCONFIG_EVENT event, DM2_AVPGRP *grp,
 	    (rc = dm_expect_uint8_type(grp, AVP_BOOL, VP_TRAVELPING, &enabled)) != RC_OK)
 		CB_ERR("Couldn't decode GET request, rc=%d", rc);
 
-	set_java(name, enabled);
+	set_app(name, enabled);
 }
 
 static void
-listJava(DMCONTEXT *dmCtx)
+listApp(DMCONTEXT *dmCtx)
 {
 	/*
-	 * If necessary to support multiple Java apps, this needs to be adapted.
+	 * If necessary to support multiple apps, this needs to be adapted.
 	 */
 	static const char *paths[] = {
-		"java.application.1.name",
-		"java.application.1.enabled"
+		"applications.application.1.name",
+		"applications.application.1.enabled"
 	};
 
 	uint32_t rc;
 
 	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
-	                      javaReceived, NULL);
+	                      appReceived, NULL);
 	if (rc != RC_OK)
-		CB_ERR("Couldn't get Java parameters, rc=%d", rc);
+		CB_ERR("Couldn't get parameters, rc=%d", rc);
 }
 
 static void
@@ -996,7 +996,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	bool sparkplug_changed = false;
 	bool wwan_4g_changed = false;
 	bool wifi_changed = false;
-	bool java_changed = false;
+	bool app_changed = false;
 
 	do {
 		DM2_AVPGRP grp;
@@ -1042,7 +1042,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		sparkplug_changed |= strncmp(path, "sparkplug.", 10) == 0;
 		wwan_4g_changed |= strncmp(path, "wwan-4g.", 8) == 0;
 		wifi_changed |= strncmp(path, "wifi.", 5) == 0;
-		java_changed |= strncmp(path, "java.", 5) == 0;
+		app_changed |= strncmp(path, "applications.", 5) == 0;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
 
 	/*
@@ -1055,8 +1055,8 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		listWWAN4G(ctx);
 	if (wifi_changed)
 		listWifi(ctx);
-	if (java_changed)
-		listJava(ctx);
+	if (app_changed)
+		listApp(ctx);
 
 	return dm_expect_end(obj);
 }
@@ -1479,10 +1479,10 @@ void init_comm(struct ev_loop *loop)
 	logx(LOG_INFO, "Registered recursive notification for \"wifi\", rc=%d.", rc);
 
 	/*
-	 * Requires the optional metropolis-java Yang module.
+	 * Requires the optional metropolis-app Yang module.
 	 */
-	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "java", NULL);
-	logx(LOG_INFO, "Registered recursive notification for \"java\", rc=%d.", rc);
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "applications", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"applications\", rc=%d.", rc);
 
 	/*
 	 * NOTE: Beginning with the first asynchronous method call, we must no longer
@@ -1497,5 +1497,5 @@ void init_comm(struct ev_loop *loop)
 	listSparkplug(dmCtx);
 	listWWAN4G(dmCtx);
 	listWifi(dmCtx);
-	listJava(dmCtx);
+	listApp(dmCtx);
 }

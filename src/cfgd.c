@@ -699,13 +699,13 @@ void set_wifi(const char *ssid, const char *password,
 }
 
 /*
- * Multiple Java apps can be implemented in the future.
+ * Multiple apps can be implemented in the future.
  * That's way we already get the `name` passed.
  * Should we need multiple apps, this could be passed to a service template.
  */
-void set_java(const char *name, bool enabled)
+void set_app(const char *name, bool enabled)
 {
-	vasystem("systemctl %s metropolis-java-app", enabled ? "start" : "stop");
+	vasystem("systemctl %s metropolis-app", enabled ? "start" : "stop");
 }
 
 void set_hostname(const char *str)
