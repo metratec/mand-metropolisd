@@ -705,7 +705,12 @@ void set_wifi(const char *ssid, const char *password,
  */
 void set_app(const char *name, bool enabled)
 {
-	vasystem("systemctl %s metropolis-app", enabled ? "start" : "stop");
+	if (enabled) {
+		vasystem("systemctl reset-failed metropolis-app");
+		vasystem("systemctl start metropolis-app");
+	} else {
+		vasystem("systemctl stop metropolis-app");
+	}
 }
 
 void set_hostname(const char *str)

@@ -1042,7 +1042,8 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		sparkplug_changed |= strncmp(path, "sparkplug.", 10) == 0;
 		wwan_4g_changed |= strncmp(path, "wwan-4g.", 8) == 0;
 		wifi_changed |= strncmp(path, "wifi.", 5) == 0;
-		app_changed |= strncmp(path, "applications.", 5) == 0;
+		app_changed |= strncmp(path, "applications.", 13) == 0 &&
+		               strstr(path, ".enabled") != NULL;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
 
 	/*
