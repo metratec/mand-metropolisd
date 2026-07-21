@@ -1528,10 +1528,12 @@ void init_comm(struct ev_loop *loop)
 
 	/*
 	 * Requires the optional metropolis-ex10 Yang module (PulsarLR). ex10.mode
-	 * selects the reader's AT client; we start/stop pulsar-llrpd on it.
+	 * selects the reader's AT client; we start/stop pulsar-llrpd on it. Register
+	 * the "ex10" container (recursive notify rejects a bare leaf path); the
+	 * change handler filters down to the ex10.mode leaf.
 	 */
-	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "ex10.mode", NULL);
-	logx(LOG_INFO, "Registered recursive notification for \"ex10.mode\", rc=%d.", rc);
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "ex10", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"ex10\", rc=%d.", rc);
 
 	/*
 	 * NOTE: Beginning with the first asynchronous method call, we must no longer
