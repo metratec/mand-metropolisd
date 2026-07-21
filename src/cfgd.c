@@ -713,6 +713,22 @@ void set_app(const char *name, bool enabled)
 	}
 }
 
+/*
+ * The LLRP server (pulsar-llrpd) is an AT client of ex10-at: when running it
+ * owns the reader's AT socket, so it must run only while ex10.mode is "llrp"
+ * and be stopped in every other mode. The service is shipped disabled and
+ * driven from here, the same arrangement as metropolis-app above.
+ */
+void set_llrp(bool enabled)
+{
+	if (enabled) {
+		vasystem("systemctl reset-failed pulsar-llrpd");
+		vasystem("systemctl start pulsar-llrpd");
+	} else {
+		vasystem("systemctl stop pulsar-llrpd");
+	}
+}
+
 void set_hostname(const char *str)
 {
 	if (sethostname(str, strlen(str))) {

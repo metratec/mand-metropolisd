@@ -964,6 +964,43 @@ listApp(DMCONTEXT *dmCtx)
 }
 
 static void
+ex10ModeReceived(DMCONTEXT *dmCtx __attribute__((unused)), DMCONFIG_EVENT event,
+                 DM2_AVPGRP *grp, void *userdata __attribute__((unused)))
+{
+	uint32_t rc, answer_rc;
+
+	if (event != DMCONFIG_ANSWER_READY)
+	        CB_ERR("Couldn't get ex10.mode, ev=%d.\n", event);
+
+	if ((rc = dm_expect_uint32_type(grp, AVP_RC, VP_TRAVELPING, &answer_rc)) != RC_OK
+	    || answer_rc != RC_OK)
+		CB_ERR("Couldn't get ex10.mode, rc=%d,%d.\n", rc, answer_rc);
+
+	char *mode;
+
+	if ((rc = dm_expect_string_type(grp, AVP_ENUM, VP_TRAVELPING, &mode)) != RC_OK)
+		CB_ERR("Couldn't decode ex10.mode, rc=%d", rc);
+
+	/* Start pulsar-llrpd only in llrp mode; stop it in every other mode. */
+	set_llrp(strcmp(mode, "llrp") == 0);
+}
+
+static void
+listEx10Mode(DMCONTEXT *dmCtx)
+{
+	static const char *paths[] = {
+		"ex10.mode"
+	};
+
+	uint32_t rc;
+
+	rc = rpc_db_get_async(dmCtx, sizeof(paths)/sizeof(paths[0]), paths,
+	                      ex10ModeReceived, NULL);
+	if (rc != RC_OK)
+		CB_ERR("Couldn't get ex10.mode, rc=%d", rc);
+}
+
+static void
 request_cb(DMCONTEXT *socket, DM_PACKET *pkt, DM2_AVPGRP *grp, void *userdata)
 {
 	DMC_REQUEST req;
@@ -997,6 +1034,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 	bool wwan_4g_changed = false;
 	bool wifi_changed = false;
 	bool app_changed = false;
+	bool ex10_mode_changed = false;
 
 	do {
 		DM2_AVPGRP grp;
@@ -1044,6 +1082,7 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		wifi_changed |= strncmp(path, "wifi.", 5) == 0;
 		app_changed |= strncmp(path, "applications.", 13) == 0 &&
 		               strstr(path, ".enabled") != NULL;
+		ex10_mode_changed |= strcmp(path, "ex10.mode") == 0;
 	} while ((rc = dm_expect_end(obj)) != RC_OK);
 
 	/*
@@ -1058,6 +1097,8 @@ uint32_t rpc_client_active_notify(void *ctx, DM2_AVPGRP *obj)
 		listWifi(ctx);
 	if (app_changed)
 		listApp(ctx);
+	if (ex10_mode_changed)
+		listEx10Mode(ctx);
 
 	return dm_expect_end(obj);
 }
@@ -1486,6 +1527,15 @@ void init_comm(struct ev_loop *loop)
 	logx(LOG_INFO, "Registered recursive notification for \"applications\", rc=%d.", rc);
 
 	/*
+	 * Requires the optional metropolis-ex10 Yang module (PulsarLR). ex10.mode
+	 * selects the reader's AT client; we start/stop pulsar-llrpd on it. Register
+	 * the "ex10" container (recursive notify rejects a bare leaf path); the
+	 * change handler filters down to the ex10.mode leaf.
+	 */
+	rc = rpc_recursive_param_notify(dmCtx, NOTIFY_ACTIVE, "ex10", NULL);
+	logx(LOG_INFO, "Registered recursive notification for \"ex10\", rc=%d.", rc);
+
+	/*
 	 * NOTE: Beginning with the first asynchronous method call, we must no longer
 	 * call synchronous versions.
 	 */
@@ -1499,4 +1549,5 @@ void init_comm(struct ev_loop *loop)
 	listWWAN4G(dmCtx);
 	listWifi(dmCtx);
 	listApp(dmCtx);
+	listEx10Mode(dmCtx);
 }
